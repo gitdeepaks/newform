@@ -1,0 +1,19 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+overrides:
+  baseline-browser-mapping: 2.10.30
+
+onlyBuiltDependencies:
+  - "@swc/core"
+  - esbuild
+  - sharp
+
+allowBuilds:
+  '@swc/core': true
+  esbuild: true
+  sharp: true
+
+patchedDependencies:
+  fetch-blob@3.2.0: patches/fetch-blob@3.2.0.patch

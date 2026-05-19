@@ -1,0 +1,32 @@
+diff --git a/from.js b/from.js
+index 9eaf8bfc191aef9218ad382b5149b2b6207b4812..1602f99206feb328edf75943470cdca85385c77f 100644
+--- a/from.js
++++ b/from.js
+@@ -1,6 +1,5 @@
+ import { statSync, createReadStream, promises as fs } from 'node:fs'
+ import { basename } from 'node:path'
+-import DOMException from 'node-domexception'
+ 
+ import File from './file.js'
+ import Blob from './index.js'
+diff --git a/package.json b/package.json
+index 9d07f3970eeef25c2a9bda23f30bd4d6d098fbb4..91b17cf8f1c480208189a5c27cb974e8945942a1 100644
+--- a/package.json
++++ b/package.json
+@@ -26,7 +26,7 @@
+         "node-fetch"
+     ],
+     "engines": {
+-        "node": "^12.20 || >= 14.13"
++        "node": ">=17"
+     },
+     "author": "Jimmy Wärting <jimmy@warting.se> (https://jimmy.warting.se)",
+     "license": "MIT",
+@@ -50,7 +50,6 @@
+         }
+     ],
+     "dependencies": {
+-        "node-domexception": "^1.0.0",
+         "web-streams-polyfill": "^3.0.3"
+     }
+ }
