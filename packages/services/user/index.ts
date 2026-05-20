@@ -55,8 +55,11 @@ class UserService {
     if (!userInsertResult || userInsertResult.length === 0 || !userInsertResult[0]?.id) {
       throw new Error("Failed to create user");
     }
+    const userId = userInsertResult[0].id;
+    const { token } = await this.generateUserToken({ id: userId });
     return {
-      id: userInsertResult[0].id,
+      id: userId,
+      token,
     };
   }
 }

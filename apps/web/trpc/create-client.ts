@@ -11,5 +11,11 @@ export const createTRPCHttpBatchClientClient = (opts?: CreateTRPCHttpBatchClient
     url:
       env.NEXT_PUBLIC_API_URL ??
       (typeof window === "undefined" ? "http://localhost:8000/trpc" : "/trpc"),
+    fetch: (url, options) => {
+      return fetch(url, {
+        ...options,
+        credentials: "include",
+      });
+    },
   });
 };
