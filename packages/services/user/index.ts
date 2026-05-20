@@ -5,7 +5,9 @@ import {
   createUserWithEmailAndPasswordInputSchema,
   CreateUserWithEmailAndPasswordInputSchemaType,
   generateUserTokenPayload,
+  signInUserWithEmailAndPasswordInputSchema,
   type GenerateUserTokenPayloadType,
+  type SignInUserWithEmailAndPasswordInputSchemaType,
 } from "./model";
 import * as JWT from "jsonwebtoken";
 import { env } from "../env";
@@ -25,6 +27,10 @@ class UserService {
     return { token };
   }
 
+  private async generateHashPassword(password: string, salt: string) {
+    return createHmac("sha256", salt).update(password).digest("hex");
+  }
+
   public async createUserWithEmailAndPassword(
     input: CreateUserWithEmailAndPasswordInputSchemaType,
   ) {
@@ -38,7 +44,7 @@ class UserService {
     if (existingUserWithEmail) throw new Error("User With Email Already Exists");
     // calculate salt and hash
     const salt = randomBytes(16).toString("hex");
-    const hash = createHmac("sha256", salt).update(password).digest("hex");
+    const hash = await this.generateHashPassword(password, salt);
 
     // Create user in database
     const userInsertResult = await db
@@ -59,6 +65,30 @@ class UserService {
     const { token } = await this.generateUserToken({ id: userId });
     return {
       id: userId,
+      token,
+    };
+  }
+
+  public async singnInUserWithEmailAndPassword(
+    payload: SignInUserWithEmailAndPasswordInputSchemaType,
+  ) {
+    const { email, password } = await signInUserWithEmailAndPasswordInputSchema.parseAsync(payload);
+
+    // check if user exists
+    const existingUser = await this.getUserByEmail(email);
+    if (!existingUser) throw new Error(`User With ${email} Not Found`);
+
+    if (!existingUser.password || !existingUser.salt)
+      throw new Error("Invalid authentication method");
+
+    const hash = await this.generateHashPassword(password, existingUser.salt);
+
+    if (hash !== existingUser.password) throw new Error("Invalid Email Or Password");
+
+    const { token } = await this.generateUserToken({ id: existingUser.id });
+
+    return {
+      id: existingUser.id,
       token,
     };
   }

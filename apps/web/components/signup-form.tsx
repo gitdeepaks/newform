@@ -350,7 +350,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
         <Link
-          href="/sign-in"
+          href="/login"
           className="font-medium text-foreground underline-offset-4 hover:underline"
         >
           Sign in

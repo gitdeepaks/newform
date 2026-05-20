@@ -5,6 +5,16 @@ export const createUserWithEmailAndPasswordInputSchema = z.object({
   email: z.email().describe("The email of the user"),
   password: z.string().min(8).describe("The password of the user"),
 });
+
 export const createUserWithEmailAndPasswordOutputSchema = z.object({
+  id: z.string().describe("The id of the user"),
+});
+
+export const signInUserWithEmailAndPasswordInputSchema = z.object({
+  email: z.email().describe("The email of the user"),
+  password: z.string().min(8).describe("The password of the user"),
+});
+
+export const signInUserWithEmailAndPasswordOutputSchema = z.object({
   id: z.string().describe("The id of the user"),
 });
