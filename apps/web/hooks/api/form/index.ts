@@ -52,3 +52,112 @@ export const useForms = () => {
     formsStatus,
   };
 };
+
+export const useCreateField = () => {
+  const utils = trpc.useUtils();
+  const {
+    mutateAsync: createFieldAsync,
+    mutate: createField,
+    error: createFieldError,
+    isPending: createFieldIsPending,
+    isSuccess: createFieldIsSuccess,
+    isError: createFieldIsError,
+    isIdle: createFieldIsIdle,
+    status: createFieldStatus,
+  } = trpc.form.createField.useMutation({
+    onSuccess: async () => {
+      await utils.form.getFields.invalidate();
+    },
+  });
+
+  return {
+    createFieldAsync,
+    createField,
+    createFieldError,
+    createFieldIsPending,
+    createFieldIsSuccess,
+    createFieldIsError,
+    createFieldIsIdle,
+    createFieldStatus,
+  };
+};
+
+export const useFields = (formId: string) => {
+  const {
+    data: fields,
+    error: fieldsError,
+    isLoading: fieldsIsLoading,
+    isFetching: fieldsIsFetching,
+    isFetched: fieldsIsFetched,
+    isError: fieldsIsError,
+    status: fieldsStatus,
+  } = trpc.form.getFields.useQuery({ formId });
+
+  return {
+    fields,
+    fieldsError,
+    fieldsIsLoading,
+    fieldsIsFetching,
+    fieldsIsFetched,
+    fieldsIsError,
+    fieldsStatus,
+  };
+};
+
+export const useUpdateField = () => {
+  const utils = trpc.useUtils();
+  const {
+    mutateAsync: updateFieldAsync,
+    mutate: updateField,
+    error: updateFieldError,
+    isPending: updateFieldIsPending,
+    isSuccess: updateFieldIsSuccess,
+    isError: updateFieldIsError,
+    isIdle: updateFieldIsIdle,
+    status: updateFieldStatus,
+  } = trpc.form.updateField.useMutation({
+    onSuccess: async () => {
+      await utils.form.getFields.invalidate();
+    },
+  });
+
+  return {
+    updateFieldAsync,
+    updateField,
+    updateFieldError,
+    updateFieldIsPending,
+    updateFieldIsSuccess,
+    updateFieldIsError,
+    updateFieldIsIdle,
+    updateFieldStatus,
+  };
+};
+
+export const useDeleteField = () => {
+  const utils = trpc.useUtils();
+  const {
+    mutateAsync: deleteFieldAsync,
+    mutate: deleteField,
+    error: deleteFieldError,
+    isPending: deleteFieldIsPending,
+    isSuccess: deleteFieldIsSuccess,
+    isError: deleteFieldIsError,
+    isIdle: deleteFieldIsIdle,
+    status: deleteFieldStatus,
+  } = trpc.form.deleteField.useMutation({
+    onSuccess: async () => {
+      await utils.form.getFields.invalidate();
+    },
+  });
+
+  return {
+    deleteFieldAsync,
+    deleteField,
+    deleteFieldError,
+    deleteFieldIsPending,
+    deleteFieldIsSuccess,
+    deleteFieldIsError,
+    deleteFieldIsIdle,
+    deleteFieldStatus,
+  };
+};
