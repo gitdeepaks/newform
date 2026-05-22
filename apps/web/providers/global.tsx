@@ -30,6 +30,9 @@ export const GlobalProviders: React.FC<{ children: React.ReactNode }> = ({ child
         defaultTheme="dark"
         enableSystem
         disableTransitionOnChange
+        scriptProps={
+          typeof window === "undefined" ? undefined : { type: "application/json" }
+        }
       >
         <trpc.Provider queryClient={queryClient} client={trpcClient}>
           {children}

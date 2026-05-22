@@ -28,6 +28,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useSignup } from "@/hooks/api/auth";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 const signupSchema = z
   .object({
@@ -147,6 +148,8 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
     createUserWithEmailAndPasswordIsPending,
   } = useSignup();
 
+  const router = useRouter();
+
   const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<SignupFormValues>({
@@ -171,6 +174,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
         email: values.email,
         password: values.password,
       });
+      router.push("/dashboard");
       toast.success("Account created successfully");
       form.reset();
     } catch (error) {

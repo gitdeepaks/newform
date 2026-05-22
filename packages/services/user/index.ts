@@ -21,9 +21,45 @@ class UserService {
     return result[0];
   }
 
+  private verifyUserToken(token: string): GenerateUserTokenPayloadType {
+    try {
+      const decoded = JWT.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] });
+
+      if (typeof decoded === "string") {
+        throw new Error("Invalid token");
+      }
+
+      const parsed = generateUserTokenPayload.safeParse(decoded);
+      if (!parsed.success) {
+        throw new Error("Invalid token");
+      }
+
+      return parsed.data;
+    } catch {
+      throw new Error(`Invalid token`);
+    }
+  }
+
+  private async getUserInfiById(id: string) {
+    const user = await db
+      .select({
+        id: usersTable.id,
+        email: usersTable.email,
+        fullName: usersTable.fullName,
+        profileImageUrl: usersTable.profileImageUrl,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, id));
+
+    if (!user || user.length === 0 || !user[0]) {
+      throw new Error(`User With ${id} Not Found`);
+    }
+    const { profileImageUrl, ...rest } = user[0];
+    return { ...rest, profileImageUrl: profileImageUrl ?? undefined };
+  }
   private async generateUserToken(payload: GenerateUserTokenPayloadType) {
     const { id } = await generateUserTokenPayload.parseAsync(payload);
-    const token = JWT.sign({ id }, env.JWT_SECRET);
+    const token = JWT.sign({ id }, env.JWT_SECRET, { algorithm: "HS256" });
     return { token };
   }
 
@@ -91,6 +127,12 @@ class UserService {
       id: existingUser.id,
       token,
     };
+  }
+
+  public async verifyAndDecodeuserToken(token: string) {
+    const { id } = await this.verifyUserToken(token);
+    const userInfo = await this.getUserInfiById(id);
+    return { ...userInfo };
   }
 }
 

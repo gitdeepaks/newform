@@ -4,6 +4,8 @@ packages:
 
 overrides:
   baseline-browser-mapping: 2.10.30
+  # fetch-blob@3.2.0 still lists this in registry metadata; patched code uses native DOMException (Node >=17)
+  fetch-blob>node-domexception: "-"
 
 onlyBuiltDependencies:
   - "@swc/core"

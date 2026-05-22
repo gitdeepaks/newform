@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useSignin } from "@/hooks/api/auth";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 type LoginFormValues = {
   email: string;
@@ -30,6 +32,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     signInUserWithEmailAndPasswordError,
     signInUserWithEmailAndPasswordIsPending,
   } = useSignin();
+  const router = useRouter();
+
   const form = useForm<LoginFormValues>({
     defaultValues: {
       email: "",
@@ -43,6 +47,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       email: values.email,
       password: values.password,
     });
+    if (id) {
+      router.push("/dashboard");
+      toast.success("Login successful");
+    } else {
+      toast.error("Invalid email or password");
+    }
   }
 
   return (
