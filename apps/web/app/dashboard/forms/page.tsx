@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -23,10 +24,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateForm } from "@/hooks/api/form";
+import { useCreateForm, useForms } from "@/hooks/api/form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PlusIcon } from "lucide-react";
+import { ArrowUpRightIcon, PlusIcon } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -43,6 +53,7 @@ export default function FormsPage() {
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { createFormAsync, createFormError, createFormIsPending } = useCreateForm();
+  const { forms, formsError, formsIsLoading } = useForms();
 
   const form = useForm<CreateFormValues>({
     resolver: zodResolver(createFormSchema),
@@ -96,6 +107,72 @@ export default function FormsPage() {
               Create form
             </Button>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Your forms</CardTitle>
+              <CardDescription>Open a form to edit questions and builder settings.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {formsIsLoading ? (
+                <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Spinner />
+                  Loading forms...
+                </div>
+              ) : formsError ? (
+                <Alert variant="destructive">
+                  <AlertDescription>{formsError.message}</AlertDescription>
+                </Alert>
+              ) : forms && forms.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden md:table-cell">Description</TableHead>
+                      <TableHead className="hidden sm:table-cell">Created</TableHead>
+                      <TableHead className="w-24 text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {forms.map((userForm) => (
+                      <TableRow key={userForm.id}>
+                        <TableCell className="font-medium">
+                          <Link href={`/dashboard/forms/${userForm.id}`} className="hover:underline">
+                            {userForm.title}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="hidden max-w-md truncate text-muted-foreground md:table-cell">
+                          {userForm.description || "No description"}
+                        </TableCell>
+                        <TableCell className="hidden text-muted-foreground sm:table-cell">
+                          {userForm.createdAt ? new Date(userForm.createdAt).toLocaleDateString() : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button asChild variant="ghost" size="sm">
+                            <Link href={`/dashboard/forms/${userForm.id}`}>
+                              Builder
+                              <ArrowUpRightIcon />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-lg border border-dashed text-center">
+                  <div>
+                    <p className="font-medium">No forms yet</p>
+                    <p className="text-sm text-muted-foreground">Create your first form to start collecting responses.</p>
+                  </div>
+                  <Button onClick={() => setOpen(true)}>
+                    <PlusIcon />
+                    Create form
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </SidebarInset>
 

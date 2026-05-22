@@ -6,4 +6,9 @@ export const createFormInputSchema = z.object({
   createdBy: z.string().describe("The id of the user creating the form"),
 });
 
+export const listFromByUserIdInputSchema = z.object({
+  userId: z.string().describe("The id of the user who created the forms"),
+});
+
 export type CreateFormInputSchemaType = z.infer<typeof createFormInputSchema>;
+export type ListFromByUserIdInputSchemaType = z.infer<typeof listFromByUserIdInputSchema>;
