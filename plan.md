@@ -1,744 +1,480 @@
-# Typeform-Style Form Builder SaaS Plan
-
-## Current Repo Baseline
-
-- Monorepo uses `pnpm`, Turborepo, Next.js web app, Express API app, tRPC, Drizzle, Zod, and Scalar/OpenAPI.
-- Apps:
-  - `apps/web`: Next.js frontend.
-  - `apps/api`: Express backend with `/trpc`, `/api`, `/openapi.json`, and `/docs`.
-- Packages:
-  - `packages/database`: Drizzle PostgreSQL database layer.
-  - `packages/trpc`: shared tRPC router and client types.
-  - `packages/services`: business logic layer.
-  - `packages/logger`, `packages/eslint-config`, `packages/typescript-config`.
-- Existing code has a user table, health router, auth route shell, signup UI, signup backend flow, and Scalar docs plumbing.
-
-## Important Constraint
-
-- Signup page and backend signup flow are already implemented.
-- Do not rebuild signup unless bugs are found during verification.
-- Auth work should continue from the existing signup implementation.
-
-## Product Goal
-
-Build a production-style Typeform-like SaaS where creators can create, publish, share, and analyze dynamic forms, while public respondents can submit forms without logging in.
-
-## Core Tech Requirements
-
-- Turborepo for monorepo orchestration.
-- Separate frontend and backend apps.
-- tRPC for type-safe APIs.
-- Zod for form schema and response validation.
-- Drizzle ORM with PostgreSQL.
-- Scalar API documentation.
-- Shared packages for schemas, services, database, and typed clients.
-
-## Phase 1: Foundation And Project Cleanup
-
-### Goals
-
-- Rename product branding from starter names to the final SaaS name.
-- Confirm app/package dependency flow.
-- Add required env documentation.
-- Establish consistent folders for forms, responses, themes, analytics, and auth.
-
-### Tasks
-
-1. Choose product name.
-2. Update API title and landing copy.
-3. Add `.env.example` files where needed.
-4. Document local ports:
-   - Web: `http://localhost:3000`
-   - API: `http://localhost:8000`
-   - Docs: `http://localhost:8000/docs`
-5. Confirm root scripts:
-   - `pnpm dev`
-   - `pnpm build`
-   - `pnpm lint`
-   - `pnpm check-types`
-   - `pnpm db:generate`
-   - `pnpm db:migrate`
-6. Add seed script entrypoint.
-
-### Acceptance Criteria
-
-- Existing app still boots.
-- Existing signup flow still works.
-- API docs route still works.
-- README has correct local setup basics.
-
-## Phase 2: Database Schema Design
-
-### Goals
-
-Create a scalable schema for creators, sessions, forms, fields, themes, responses, analytics, email events, and API keys.
-
-### Tables
-
-1. `users`
-   - Keep existing creator identity table.
-   - Add optional fields only if required.
-
-2. `sessions`
-   - `id`
-   - `userId`
-   - `tokenHash`
-   - `expiresAt`
-   - `createdAt`
-
-3. `forms`
-   - `id`
-   - `ownerId`
-   - `title`
-   - `description`
-   - `slug`
-   - `status`: `draft`, `published`, `archived`
-   - `visibility`: `public`, `unlisted`
-   - `themeId`
-   - `thankYouTitle`
-   - `thankYouMessage`
-   - `passwordHash`
-   - `expiresAt`
-   - `responseLimit`
-   - `publishedAt`
-   - `createdAt`
-   - `updatedAt`
-
-4. `form_fields`
-   - `id`
-   - `formId`
-   - `order`
-   - `type`: `short_text`, `long_text`, `email`, `number`, `single_select`, `multi_select`, `checkbox`, `rating`, `date`
-   - `label`
-   - `description`
-   - `placeholder`
-   - `required`
-   - `options`
-   - `validation`
-   - `settings`
-   - `createdAt`
-   - `updatedAt`
-
-5. `themes`
-   - `id`
-   - `ownerId`
-   - `name`
-   - `category`: `movie`, `anime`, `game`, `startup`, `tech`, `os`, `event`, `community`
-   - `tokens`
-   - `isPublic`
-   - `createdAt`
-
-6. `form_responses`
-   - `id`
-   - `formId`
-   - `respondentEmail`
-   - `answers`
-   - `metadata`
-   - `submittedAt`
-
-7. `response_events`
-   - `id`
-   - `formId`
-   - `responseId`
-   - `type`: `view`, `start`, `submit`
-   - `metadata`
-   - `createdAt`
-
-8. `email_events`
-   - `id`
-   - `formId`
-   - `responseId`
-   - `recipient`
-   - `type`: `creator_notification`, `respondent_confirmation`
-   - `status`: `queued`, `sent`, `failed`, `skipped`
-   - `error`
-   - `createdAt`
-
-9. `api_keys`
-   - `id`
-   - `userId`
-   - `name`
-   - `keyHash`
-   - `lastUsedAt`
-   - `createdAt`
-   - `revokedAt`
-
-### Acceptance Criteria
-
-- Drizzle schema exists for all core tables.
-- Migration generates successfully.
-- Database relations are clear.
-- Seed data can reference all tables.
-
-## Phase 3: Shared Zod Schemas
-
-### Goals
-
-Make dynamic forms safe and typeable using Zod.
-
-### Schemas
-
-1. Field schemas:
-   - Base field schema.
-   - Per-field settings schema.
-   - Field validation schema.
-   - Option schema for select fields.
-
-2. Form schemas:
-   - Create form input.
-   - Update form input.
-   - Publish form input.
-   - Theme assignment input.
-   - Field reorder input.
-
-3. Response schemas:
-   - Public submit input.
-   - Dynamic answer validation from stored form fields.
-   - Response filter input.
-   - Pagination input.
-
-4. Analytics schemas:
-   - Date range input.
-   - Form analytics output.
-   - Field breakdown output.
-
-### Acceptance Criteria
-
-- All public inputs are validated with Zod.
-- Dynamic response validation checks required fields and field type constraints.
-- Shared schemas live in `packages/trpc` or a dedicated shared package if needed.
-
-## Phase 4: Complete Authentication
-
-### Existing
-
-- Signup UI exists.
-- Signup backend flow exists.
-
-### Remaining Backend Tasks
-
-1. Verify existing signup flow and reuse it.
-2. Implement login mutation.
-3. Implement logout mutation.
-4. Implement session persistence.
-5. Add `protectedProcedure` in tRPC context.
-6. Add current user endpoint.
-7. Read user session from cookie or auth header.
-
-### Remaining Frontend Tasks
-
-1. Login page.
-2. Auth state provider or server-side auth helper.
-3. Protected dashboard redirects.
-4. User menu and logout.
-5. Demo credential shortcut.
-
-### Acceptance Criteria
-
-- Existing signup keeps working.
-- Creator can log in after signup.
-- Creator session persists.
-- Dashboard routes require auth.
-- Public form routes do not require auth.
-
-## Phase 5: Creator Dashboard
-
-### Goals
-
-Build the main SaaS dashboard for creators.
-
-### Pages
-
-1. `/dashboard`
-   - Form list.
-   - Stats summary.
-   - Create form CTA.
-
-2. `/dashboard/forms/new`
-   - Create form flow.
-
-3. `/dashboard/forms/[formId]`
-   - Form overview.
-   - Publish status.
-   - Share link.
-   - Response count.
-   - Conversion metrics.
-
-4. `/dashboard/forms/[formId]/builder`
-   - Dynamic field builder.
-   - Field reorder.
-   - Field settings.
-   - Validation config.
-   - Theme selector.
-   - Preview panel.
-
-5. `/dashboard/forms/[formId]/responses`
-   - Response table.
-   - Response detail drawer.
-   - Filtering.
-   - Pagination.
-   - CSV export.
-
-6. `/dashboard/forms/[formId]/analytics`
-   - Views.
-   - Starts.
-   - Submissions.
-   - Completion rate.
-   - Field-level summaries.
-
-7. `/dashboard/themes`
-   - Theme gallery.
-   - Preview cards.
-
-### Acceptance Criteria
-
-- Creator can manage forms end-to-end.
-- Builder supports required field types.
-- UI is responsive and usable.
-
-## Phase 6: Form Builder
-
-### Goals
-
-Allow creators to build dynamic forms without code.
-
-### Field Types
-
-Required:
-
-- Short text.
-- Long text.
-- Email.
-- Number.
-- Single select.
-- Multi select.
-
-Encouraged:
-
-- Checkbox.
-- Dropdown.
-- Rating.
-- Date.
-
-### Builder Features
-
-1. Add field.
-2. Edit field label.
-3. Edit description.
-4. Edit placeholder.
-5. Toggle required.
-6. Configure options.
-7. Configure min/max length.
-8. Configure number min/max.
-9. Configure rating scale.
-10. Reorder fields.
-11. Delete field.
-12. Preview before publishing.
-
-### Acceptance Criteria
-
-- Saved form schema can generate a public form.
-- Invalid builder inputs are blocked.
-- Creator can publish only forms with at least one valid field.
-
-## Phase 7: Public Form Filling
-
-### Goals
-
-Public respondents can fill published forms without logging in.
-
-### Routes
-
-1. `/f/[slug]`
-   - Public form page.
-
-2. `/f/[slug]/thank-you`
-   - Confirmation screen.
-
-### Backend Tasks
-
-1. Public form lookup.
-2. Public response submission.
-3. Dynamic Zod validation.
-4. Rate limiting by IP and form.
-5. Basic spam protection.
-6. Response limit check.
-7. Expiry check.
-8. Password check if enabled.
-
-### Frontend Tasks
-
-1. Render dynamic form fields.
-2. Theme public form page.
-3. Handle loading, error, expired, closed, and not found states.
-4. Submit response.
-5. Show thank-you screen.
-
-### Acceptance Criteria
-
-- Public users can submit without auth.
-- Draft/unpublished forms are inaccessible.
-- Invalid answers return useful errors.
-- Submission flow ends in a confirmation screen.
-
-## Phase 8: Publishing And Sharing
-
-### Goals
-
-Creators can publish, unpublish, and share forms.
+# 3-Day Build Plan: Typeform-Style Form Builder SaaS
+
+## Current Project Status
+
+This repo is already a Turborepo monorepo with separate frontend and backend apps.
+
+- `apps/web`: Next.js App Router frontend.
+- `apps/api`: Express API server with tRPC, OpenAPI JSON, and Scalar docs at `/docs`.
+- `packages/trpc`: tRPC routers, Zod input/output schemas, typed client exports.
+- `packages/services`: business logic for users, forms, and fields.
+- `packages/database`: Drizzle PostgreSQL schema.
+
+Already implemented or partially implemented:
+
+- Email/password signup backend and UI.
+- Email/password login backend and UI.
+- Cookie-based `protectedProcedure` in tRPC.
+- Creator dashboard shell using sidebar components.
+- Protected form creation and form listing.
+- Protected form field CRUD for basic field types.
+- Scalar/OpenAPI plumbing exists in `apps/api/src/server.ts`.
 
-### Features
-
-1. Publish/unpublish toggle.
-2. Public/unlisted visibility.
-3. Custom slug.
-4. Copy share link.
-5. QR code sharing.
-6. Optional password protection.
-7. Optional expiry date.
-8. Optional response limit.
+Major missing pieces:
 
-### Acceptance Criteria
+- Proper form lifecycle: draft, published, unpublished/archived.
+- Public vs unlisted visibility.
+- Public form rendering and public response submission.
+- Response storage, response management, analytics.
+- Full required field types: long text, single select, multi select, checkbox, rating, date.
+- Field options and validation configuration.
+- Themes, templates, seed data, demo credentials.
+- Landing page, pricing page, explore/templates page.
+- Rate limiting and spam protection for public submissions.
+- Email notification flow.
+- README updates and deployment checklist.
 
-- Published forms are accessible by link.
-- Unlisted forms are not shown in public discovery but work by URL.
-- Slug conflicts are handled.
-- Share UI is demo-friendly.
+## Strategy
 
-## Phase 9: Themes And Templates
+We have only 3 days, so the goal is a complete, judge-friendly MVP first, then polish and bonuses. Avoid overbuilding admin dashboards, conditional logic, complex multi-page forms, and real email/payment integrations unless all core requirements are done.
 
-### Goals
+Priority order:
 
-Make the product visually memorable and hackathon-demo friendly.
+1. Core product loop: creator creates form, adds fields, publishes, shares link, respondent submits, creator sees responses and analytics.
+2. Required compliance: Turborepo, tRPC, Zod, Drizzle, Scalar, auth, public/unlisted visibility, seed data, README.
+3. Demo polish: landing, pricing, themes, templates, seeded analytics, demo credentials.
+4. Bonus features only if time remains: CSV export, preview, custom slug, QR code, expiry/response limit.
 
-### Seeded Theme Categories
+## Day 1: Data Model, Auth Hardening, Form Builder Core
 
-1. Movie theme.
-2. Anime theme.
-3. Game theme.
-4. Startup theme.
-5. Tech company theme.
-6. Operating system theme.
-7. Event/community theme.
+Goal: make the backend schema and creator-side form builder capable of supporting the full product.
+
+### 1. Database Schema
 
-### Theme Tokens
+Update `packages/database` with the production tables needed for the app.
 
-- Background.
-- Foreground.
-- Card color.
-- Accent color.
-- Font style.
-- Border radius.
-- Button style.
-- Progress style.
+Must add or extend:
 
-### Template Forms
+- `forms`
+  - `id`, `title`, `description`, `slug`, `createdBy`
+  - `status`: `draft`, `published`, `archived`
+  - `visibility`: `public`, `unlisted`
+  - `themeId`, `thankYouTitle`, `thankYouMessage`
+  - `publishedAt`, `expiresAt`, `responseLimit`
+  - `createdAt`, `updatedAt`
+- `form_fields`
+  - replace/extend field enum to include `SHORT_TEXT`, `LONG_TEXT`, `EMAIL`, `NUMBER`, `SINGLE_SELECT`, `MULTI_SELECT`, `CHECKBOX`, `RATING`, `DATE`
+  - add `options` JSON for select/multi-select/checkbox choices
+  - add `validation` JSON for min/max length, min/max number, rating scale, date limits
+  - keep `label`, `description`, `placeholder`, `isRequired`, `index`, `labelKey`
+- `themes`
+  - `id`, `name`, `category`, `tokens`, `isPublic`, `createdBy`, `createdAt`
+- `form_responses`
+  - `id`, `formId`, `respondentEmail`, `answers`, `metadata`, `submittedAt`
+- `response_events`
+  - `id`, `formId`, `responseId`, `type`, `metadata`, `createdAt`
+- `email_events`
+  - `id`, `formId`, `responseId`, `recipient`, `type`, `status`, `error`, `createdAt`
 
-Seed at least 3:
+Acceptance:
 
-1. Anime convention feedback form.
-2. Startup product-market fit survey.
-3. Gaming tournament registration form.
+- `pnpm db:generate` works.
+- Existing auth and form creation still compile after schema changes.
+- Schema supports all required requirements without another migration rewrite.
 
-### Acceptance Criteria
+### 2. Shared Zod Schemas
 
-- Public forms visually change based on theme.
-- Templates can be cloned into user forms.
-- Seed data includes themes, forms, responses, and analytics.
+Keep schemas close to the tRPC route models for speed, but make them reusable and strict.
 
-## Phase 10: Responses And Analytics
+Add schemas for:
 
-### Goals
+- Create/update form.
+- Publish/unpublish form.
+- Update visibility.
+- Update slug/settings.
+- Create/update field with options and validation.
+- Public form lookup.
+- Public response submission.
+- Response list pagination.
+- Analytics date filters.
 
-Creators need useful insights.
+Important validation rules:
 
-### Response Management
+- Field type decides what options/validation are allowed.
+- Required fields cannot be empty during submission.
+- Select answers must match configured options.
+- Email must be valid email.
+- Number must respect min/max if configured.
+- Rating must respect configured scale.
 
-1. Response list.
-2. Response detail.
-3. Search/filter by date and answer.
-4. Pagination.
-5. CSV export.
-6. Delete response if needed.
+Acceptance:
 
-### Analytics
+- All tRPC procedures have Zod input/output schemas.
+- Dynamic public response validation is done server-side before insert.
 
-1. Total views.
-2. Total starts.
-3. Total submissions.
-4. Completion rate.
-5. Submission trend chart.
-6. Field answer distribution.
-7. Average rating.
-8. Select option breakdown.
+### 3. Auth And Route Protection
 
-### Acceptance Criteria
+Current signup/login exists, so do not rebuild it. Harden what is already there.
 
-- Analytics page renders seeded and real data.
-- Charts use existing `recharts`.
-- Response table handles many responses with pagination.
+Tasks:
 
-## Phase 11: Email Notification Flow
+- Add logout mutation if missing.
+- Ensure dashboard pages redirect unauthenticated users to `/login`.
+- Add a simple current-user check in dashboard layout or page shell.
+- Add demo credential helper text on login page.
+- Confirm public routes do not use `protectedProcedure`.
 
-### Goals
+Acceptance:
 
-Add production-style email behavior without requiring a paid provider.
+- Creator can signup, login, refresh, and stay logged in.
+- Creator-only APIs require auth.
+- Public form APIs work without auth.
 
-### Email Types
+### 4. Creator Form APIs
 
-1. Creator notification after new response.
-2. Respondent confirmation if respondent email exists.
+Expand `packages/trpc/server/routes/form/route.ts` and services.
 
-### Implementation
+Required procedures:
 
-1. Create email service abstraction.
-2. In development, log email content.
-3. In production, allow provider env config later.
-4. Store email events in database.
-5. Do not block form submission if email fails.
+- `createForm`
+- `listForms`
+- `getForm`
+- `updateForm`
+- `deleteOrArchiveForm`
+- `publishForm`
+- `unpublishForm`
+- `updateVisibility`
+- `updateSlug`
+- `createField`
+- `updateField`
+- `deleteField`
+- `reorderFields`
 
-### Acceptance Criteria
+Ownership checks are mandatory:
 
-- Submission creates email event records.
-- Creator notification can be inspected in logs or DB.
-- Failure does not break response submission.
+- A creator can only read/update/delete/publish their own forms.
+- Field APIs must verify the field belongs to a form owned by the logged-in user.
 
-## Phase 12: API Documentation With Scalar
+Acceptance:
 
-### Goals
+- Creator can manage their own forms safely.
+- Slug conflicts return a clear error.
+- Form cannot publish with zero fields.
 
-Expose documented HTTP-compatible API endpoints.
+### 5. Builder UI
 
-### Public API Endpoints
+Improve existing `/dashboard/forms` and `/dashboard/forms/[id]` instead of creating too many new pages.
 
-1. Health check.
-2. Get public form by slug.
-3. Submit public response.
-4. Creator form list.
-5. Creator form detail.
-6. Creator response list.
-7. Analytics endpoint.
+Tasks:
 
-### Tasks
+- Show form status, visibility, response count, and share link in form list.
+- On builder page, add form settings panel:
+  - title, description
+  - status publish/unpublish
+  - visibility public/unlisted
+  - slug
+  - thank-you text
+  - theme selector placeholder if theme API is not ready yet
+- Expand field dialog:
+  - all required field types
+  - options editor for select/multi-select/checkbox
+  - validation fields for text/number/rating
+- Add preview panel or preview button using the saved fields.
 
-1. Add OpenAPI metadata to tRPC procedures.
-2. Ensure `trpc-to-openapi` supports selected procedures.
-3. Keep `/openapi.json` working.
-4. Keep `/docs` Scalar UI working.
-5. Link API docs in README and landing page.
+Acceptance:
 
-### Acceptance Criteria
+- Creator can build a valid form with required field types.
+- Creator can publish/unpublish and copy a share link.
+- UI has loading/error states and works on mobile.
 
-- `/docs` loads Scalar.
-- OpenAPI JSON includes real endpoints.
-- README includes API docs URL.
+## Day 2: Public Forms, Responses, Analytics, Themes
 
-## Phase 13: Landing, Pricing, And Marketing Pages
+Goal: finish the end-to-end product loop and make seeded demo data useful.
 
-### Goals
+### 1. Public Form Flow
 
-Make the app feel like a real SaaS.
+Add public frontend routes:
 
-### Pages
+- `/f/[slug]`: public form fill page.
+- `/f/[slug]/thank-you`: confirmation screen.
 
-1. `/`
-   - Hero.
-   - Product preview.
-   - Use cases.
-   - Theme showcase.
-   - CTA to signup/demo.
+Add public backend procedures:
 
-2. `/pricing`
-   - Free.
-   - Pro.
-   - Team.
-   - Note: real payments not required.
+- `getPublicFormBySlug`
+- `submitPublicResponse`
+- `trackFormEvent` or automatic view/submit event creation
 
-3. `/templates`
-   - Theme/template gallery.
+Visibility rules:
 
-4. `/docs`
-   - Link or redirect to API docs.
+- `draft` or unpublished forms: show unavailable state and reject submissions.
+- `published + public`: accessible by URL and visible on public listings.
+- `published + unlisted`: accessible by URL but hidden from explore/templates.
+- invalid slug: graceful not-found state.
+- expired form or response limit reached: graceful closed state.
 
-### Acceptance Criteria
+Submission rules:
 
-- Pages are responsive.
-- Landing communicates product clearly.
-- Pricing page is polished but does not need payment.
+- No login required.
+- Validate all answers with Zod and stored field schema.
+- Insert response and submit event in one backend flow.
+- Redirect/show thank-you screen after success.
 
-## Phase 14: Seed Data And Demo Credentials
+Acceptance:
 
-### Goals
+- A public respondent can open a link, submit, and see confirmation.
+- Invalid/unpublished forms do not accept responses.
+- Unlisted forms work by direct link only.
 
-Judges should review quickly without setup friction.
+### 2. Rate Limiting And Spam Protection
 
-### Seed Content
+Implement a simple production-style approach without adding infrastructure unless necessary.
 
-1. Demo creator:
-   - Email: `demo@example.com`
-   - Password: `password123`
+Tasks:
 
-2. Sample forms:
-   - Anime convention feedback.
-   - Startup product-market fit survey.
-   - Gaming tournament registration.
+- Add in-memory IP + form slug rate limiter in `apps/api` or service layer.
+- Limit public submissions, for example 5 submissions per IP per form per 10 minutes.
+- Add honeypot field to public form UI and reject if filled.
+- Capture metadata: IP, user agent, submittedAt.
 
-3. Sample themes:
-   - Anime neon.
-   - Retro arcade.
-   - Startup minimal.
-   - Movie premiere.
-   - OS terminal.
+Acceptance:
 
-4. Sample responses:
-   - At least 20 responses per form.
-   - Include realistic answer data.
-   - Include view/start/submit events.
+- Rapid repeated submissions are blocked with a friendly error.
+- Logged-in creator APIs are not affected.
 
-### Acceptance Criteria
+### 3. Responses Management
 
-- `pnpm db:seed` populates demo data.
-- README includes demo credentials.
-- Dashboard immediately shows analytics.
+Add creator response APIs:
 
-## Phase 15: Rate Limiting And Spam Protection
+- `listResponses`
+- `getResponse`
+- `deleteResponse` optional
+- `exportResponsesCsv` if time allows
 
-### Goals
+Add UI:
 
-Protect public submission APIs.
+- `/dashboard/forms/[id]/responses` or tabs inside `/dashboard/forms/[id]`.
+- Response table with submitted date, respondent email, answer summary.
+- Response detail drawer/card.
+- Basic pagination.
 
-### Features
+Acceptance:
 
-1. IP-based submit rate limit.
-2. Form-level rate limit.
-3. Honeypot field.
-4. Optional minimum time-to-submit check.
-5. Request metadata capture.
-6. Friendly error response.
+- Creator can view submitted public responses.
+- Creator only sees responses for own forms.
 
-### Acceptance Criteria
+### 4. Analytics
 
-- Repeated rapid submissions are blocked.
-- Legitimate submissions still work.
-- Rate limit applies only to public submission endpoints.
+Add analytics service from `form_responses` and `response_events`.
 
-## Phase 16: Bonus Features
+Metrics:
 
-### Priority Bonus List
+- total views
+- total submissions
+- completion rate
+- submissions over time
+- field-level breakdown for select/multi-select/checkbox/rating
 
-1. Form preview before publishing.
-2. CSV export.
-3. Custom form slugs.
-4. QR code sharing.
-5. Form expiry.
-6. Response limit.
-7. Theme gallery.
-8. Response filtering and pagination.
-9. Form clone/archive.
-10. Password-protected forms.
-11. Conditional logic.
-12. Multi-page form experience.
-13. Admin dashboard.
+UI:
 
-### Recommended Bonus Order
+- Analytics cards on form detail.
+- Reuse existing chart components if possible.
+- Seeded data should make charts look populated.
 
-1. Preview.
-2. CSV export.
-3. Custom slug.
-4. QR code.
-5. Expiry/response limit.
-6. Clone/archive.
-7. Password protection.
-8. Conditional logic.
+Acceptance:
 
-## Phase 17: Deployment
+- Analytics page/card works for seeded and real responses.
+- Empty states are handled for new forms.
 
-### Goals
+### 5. Themes And Public Explore
 
-Make demo judge-friendly.
+Add minimal theme system that is demo-visible.
 
-### Recommended Deployment
+Tasks:
+
+- Seed public themes with token JSON.
+- Add theme selector to builder/settings.
+- Apply theme tokens to `/f/[slug]` page.
+- Add `/explore` or `/templates` page showing only `published + public` forms.
+- Ensure unlisted forms never appear on explore/templates.
+
+Seed theme examples:
+
+- Anime neon.
+- Retro arcade.
+- Startup minimal.
+- Movie premiere.
+- OS terminal.
+
+Acceptance:
+
+- Public forms visually change by theme.
+- Public forms appear in explore/templates.
+- Unlisted forms are hidden from explore/templates.
+
+## Day 3: Demo Polish, Emails, Docs, Seeds, Deployment
+
+Goal: make the submission judge-friendly and complete all required packaging.
+
+### 1. Seed Data And Demo Credentials
+
+Add `pnpm db:seed` at root and package level.
+
+Seed:
+
+- Demo user:
+  - email: `demo@example.com`
+  - password: `password123`
+- At least 3 themed published forms:
+  - Anime convention feedback.
+  - Startup product-market fit survey.
+  - Gaming tournament registration.
+- At least one unlisted published form to prove visibility behavior.
+- At least one draft/unpublished form to prove blocked access.
+- 20+ realistic responses per main sample form.
+- View/start/submit events for analytics.
+- Themes used by sample forms.
+
+Acceptance:
+
+- Fresh database plus seed gives a demo-ready product.
+- Dashboard immediately shows forms, responses, and analytics.
+
+### 2. Email Notification Flow
+
+No real provider needed for MVP. Build an email abstraction and log/store events.
+
+Tasks:
+
+- Create email service in `packages/services`.
+- On successful public submission:
+  - create creator notification email event
+  - create respondent confirmation email event if respondent email exists
+- In dev, log email content.
+- Do not fail submission if email event creation/logging fails.
+
+Acceptance:
+
+- Email events are stored.
+- Submission is not blocked by email failures.
+
+### 3. Landing, Pricing, Templates, Docs Links
+
+Replace placeholder home page with a real SaaS landing page.
+
+Pages:
+
+- `/`: landing page with hero, product benefits, screenshots/cards, CTA, demo login, docs link.
+- `/pricing`: Free, Pro, Team pricing cards with no payment integration.
+- `/templates` or `/explore`: public forms/templates gallery.
+- Optional `/docs`: redirect/link to API docs URL if frontend route is useful.
+
+Acceptance:
+
+- Product feels complete from the public homepage.
+- Mobile layout is usable.
+- API docs link is easy to find.
+
+### 4. Scalar API Documentation
+
+Ensure OpenAPI-compatible tRPC procedures have metadata.
+
+Docs should include:
+
+- health
+- auth signup/login/current user
+- creator form list/detail/create/update/publish
+- public form lookup
+- public response submission
+- response list
+- analytics
+
+Acceptance:
+
+- `http://localhost:8000/docs` loads Scalar.
+- `http://localhost:8000/openapi.json` includes important endpoints.
+- README includes docs URL.
+
+### 5. README And Final Checklist
+
+Rewrite `README.md` for the final product, not the starter repo.
+
+Must include:
+
+- Project overview.
+- Tech stack.
+- Monorepo structure.
+- Local setup.
+- Environment variables.
+- Database setup and migrations.
+- Seed command.
+- Demo credentials.
+- API docs URL.
+- Deployment URL placeholders or final links.
+- Feature checklist.
+- Known limitations.
+
+Acceptance:
+
+- A judge can run and understand the project from README alone.
+
+### 6. Deployment
+
+Recommended deployment:
 
 - Web: Vercel.
-- API: Render, Railway, Fly.io, or similar.
-- Database: Neon, Supabase Postgres, Railway Postgres, or Render Postgres.
+- API: Render/Railway/Fly.
+- DB: Neon/Supabase/Railway Postgres.
 
-### Tasks
+Deployment tasks:
 
-1. Configure production env vars.
-2. Run migrations on production DB.
-3. Run seed script on production DB.
-4. Set CORS for deployed frontend.
-5. Verify API docs URL.
-6. Verify demo login.
-7. Verify public form link.
-8. Add deployed links to README.
+- Set production `DATABASE_URL`, JWT/auth secret, API base URL, frontend URL.
+- Set CORS to deployed frontend.
+- Run migrations.
+- Run seed.
+- Verify demo login.
+- Verify public form submission.
+- Verify Scalar docs.
+- Add final deployed links to README.
 
-### Acceptance Criteria
+Acceptance:
 
-- Public deployed app works.
+- Public deployed app works without local setup.
 - Demo credentials work.
 - API docs are accessible.
-- Public form submission works.
+- Public form links work.
 
-## Phase 18: README And Final Submission
+## Bonus Feature Priority If Time Remains
 
-### README Must Include
+Do these only after core requirements are working.
 
-1. Project overview.
-2. Tech stack.
-3. Monorepo structure.
-4. Local setup.
-5. Environment variables.
-6. Database setup.
-7. Scripts.
-8. Demo credentials.
-9. API docs link.
-10. Deployment link.
-11. Seed data description.
-12. Feature checklist.
-13. Known limitations.
+1. CSV export for responses.
+2. Form preview before publishing.
+3. Custom slug polish with availability check.
+4. QR code sharing.
+5. Form expiry and response limit UI.
+6. Form clone/archive.
+7. Password-protected forms.
+8. Conditional logic.
+9. Multi-page form experience.
+10. Admin dashboard.
 
-### Final Submission Must Include
+## Final Definition Of Done
 
-1. Public GitHub repository.
-2. Deployed frontend link.
-3. Deployed API docs link.
-4. Demo credentials.
-5. Proper README.
-
-## Suggested Build Order
-
-1. Database schema and migrations.
-2. Shared Zod schemas.
-3. Complete auth from existing signup flow.
-4. Form CRUD.
-5. Field builder APIs.
-6. Dashboard form list.
-7. Builder UI.
-8. Publish/unpublish.
-9. Public form rendering.
-10. Public response submission.
-11. Response list.
-12. Analytics.
-13. Themes.
-14. Seed data.
-15. Email flow.
-16. Rate limiting.
-17. Scalar API docs polish.
-18. Landing and pricing pages.
-19. README.
-20. Deployment verification.
-
-## Definition Of Done
-
-- Existing signup flow remains working.
-- Creator can log in and log out.
+- Creator can signup/login/logout.
+- Dashboard is protected.
 - Creator can create, edit, publish, unpublish, and manage forms.
-- Forms support dynamic field schemas and validation.
-- Public users can submit forms without logging in.
+- Forms support dynamic fields with required/optional settings.
+- Required field types are supported: short text, long text, email, number, single select, multi select.
+- Extra field types are supported if possible: checkbox, rating, date.
+- Form schemas and responses are validated with Zod.
+- Public users can submit published forms without logging in.
+- Public vs unlisted visibility works correctly.
+- Unpublished, invalid, expired, and closed form links are handled gracefully.
 - Creator can view responses and analytics.
-- API docs are available through Scalar.
-- Seed data includes at least 3 themed forms with responses and analytics.
-- Landing page, pricing page, README, demo credentials, and deployment links exist.
-- App passes typecheck, lint, and build.
+- Rate limiting protects public submission APIs.
+- Scalar API docs are available.
+- Landing page, pricing page, explore/templates page exist.
+- Seeded data includes at least 3 themed forms with responses and analytics.
+- Demo credentials are documented.
+- README is complete.
+- `pnpm lint`, `pnpm check-types`, and `pnpm build` pass before final submission.
