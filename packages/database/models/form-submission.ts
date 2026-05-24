@@ -1,16 +1,4 @@
-import {
-  pgTable,
-  uuid,
-  varchar,
-  timestamp,
-  boolean,
-  text,
-  numeric,
-  pgEnum,
-  unique,
-  json,
-} from "drizzle-orm/pg-core";
-import { usersTable } from "./user";
+import { pgTable, uuid, timestamp, json } from "drizzle-orm/pg-core";
 import { formsTable } from "./form";
 import { formFieldsTable } from "./form-field";
 
@@ -19,7 +7,7 @@ export interface FormSubmissionValues {
   value: string;
 }
 
-export type FormSunmissionValueRow = FormSubmissionValues[];
+export type FormSubmissionValueRow = FormSubmissionValues[];
 
 export const formSubmissionsTable = pgTable("form_submissions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -27,7 +15,7 @@ export const formSubmissionsTable = pgTable("form_submissions", {
   formId: uuid("form_id").references(() => formsTable.id),
   formFieldId: uuid("form_field_id").references(() => formFieldsTable.id),
 
-  values: json("values").$type<FormSunmissionValueRow>(),
+  values: json("values").$type<FormSubmissionValueRow>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
 });

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import { useForm } from "@/hooks/api/form";
+import { useForm, useSubmitForm } from "@/hooks/api/form";
 import { use, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -30,17 +30,20 @@ const inputTypeMap: Record<Field["type"], string> = {
 export default function PublicFormPage({ params }: PublicFormPageProps) {
   const { form_id } = use(params);
   const { form, formError, formIsLoading } = useForm(form_id);
+  const { submitFormAsync, submitFormIsPending } = useSubmitForm();
 
   const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   function setAnswer(fieldId: string, value: string | boolean) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
   }
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!form) return;
 
-    const missing = (form?.fields ?? []).filter((field) => {
+    const missing = form.fields.filter((field) => {
       if (!field.isRequired) return false;
       const value = answers[field.id];
       if (field.type === "YES_NO") return value !== true;
@@ -52,8 +55,22 @@ export default function PublicFormPage({ params }: PublicFormPageProps) {
       return;
     }
 
-    // TODO: wire up to a public submission endpoint once it exists.
-    toast.success("Form submitted");
+    try {
+      await submitFormAsync({
+        formId: form.id,
+        values: form.fields
+          .filter((field) => answers[field.id] !== undefined)
+          .map((field) => ({
+            formFieldId: field.id,
+            value: `${answers[field.id]}`,
+          })),
+      });
+      toast.success("Form submitted");
+      setIsSubmitted(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to submit form";
+      toast.error(message);
+    }
   }
 
   return (
@@ -68,6 +85,13 @@ export default function PublicFormPage({ params }: PublicFormPageProps) {
           <Alert variant="destructive">
             <AlertDescription>{formError.message}</AlertDescription>
           </Alert>
+        ) : isSubmitted ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl">Thanks for your response</CardTitle>
+              <CardDescription>Your submission has been recorded.</CardDescription>
+            </CardHeader>
+          </Card>
         ) : form ? (
           <Card>
             <CardHeader>
@@ -97,6 +121,7 @@ export default function PublicFormPage({ params }: PublicFormPageProps) {
                         <Switch
                           id={field.id}
                           checked={answers[field.id] === true}
+                          disabled={submitFormIsPending}
                           onCheckedChange={(checked) => setAnswer(field.id, checked)}
                         />
                       </div>
@@ -114,6 +139,7 @@ export default function PublicFormPage({ params }: PublicFormPageProps) {
                           type={inputTypeMap[field.type]}
                           placeholder={field.placeholder ?? undefined}
                           required={field.isRequired ?? false}
+                          disabled={submitFormIsPending}
                           value={(answers[field.id] as string) ?? ""}
                           onChange={(event) => setAnswer(field.id, event.target.value)}
                         />
@@ -121,7 +147,8 @@ export default function PublicFormPage({ params }: PublicFormPageProps) {
                     ),
                   )}
 
-                  <Button type="submit" className="w-full">
+                  <Button type="submit" className="w-full" disabled={submitFormIsPending}>
+                    {submitFormIsPending ? <Spinner /> : null}
                     Submit
                   </Button>
                 </form>

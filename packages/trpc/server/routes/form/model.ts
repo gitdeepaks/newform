@@ -21,6 +21,37 @@ export const listFormsOutputSchema = z.array(
   }),
 );
 
+export const submissionValueSchema = z.object({
+  formFieldId: z.string().describe("The id of the form field being answered"),
+  value: z.string().describe("The submitted value for the form field"),
+});
+
+export const submitFormInputSchema = z.object({
+  formId: z.string().describe("The id of the form being submitted"),
+  values: z.array(submissionValueSchema).describe("The submitted answers for the form fields"),
+});
+
+export const submitFormOutputSchema = z.object({
+  id: z.string().describe("The id of the created submission"),
+});
+
+export const getSubmissionsInputSchema = z.object({
+  formId: z.string().describe("The id of the form whose submissions to fetch"),
+});
+
+export const getSubmissionsOutputSchema = z.array(
+  z.object({
+    id: z.string().describe("The id of the submission"),
+    formId: z.string().nullable().describe("The id of the form this submission belongs to"),
+    values: z
+      .array(submissionValueSchema)
+      .nullable()
+      .describe("The submitted answers for the form fields"),
+    createdAt: z.date().nullable().describe("The date the submission was created"),
+    updatedAt: z.date().nullable().describe("The date the submission was last updated"),
+  }),
+);
+
 export const formFieldTypeSchema = z.enum(["TEXT", "NUMBER", "EMAIL", "YES_NO", "PASSWORD"]);
 
 export const formFieldSchema = z.object({

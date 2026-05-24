@@ -75,6 +75,52 @@ export const useForm = (formId: string) => {
   };
 };
 
+export const useSubmitForm = () => {
+  const {
+    mutateAsync: submitFormAsync,
+    mutate: submitForm,
+    error: submitFormError,
+    isPending: submitFormIsPending,
+    isSuccess: submitFormIsSuccess,
+    isError: submitFormIsError,
+    isIdle: submitFormIsIdle,
+    status: submitFormStatus,
+  } = trpc.form.submitForm.useMutation();
+
+  return {
+    submitFormAsync,
+    submitForm,
+    submitFormError,
+    submitFormIsPending,
+    submitFormIsSuccess,
+    submitFormIsError,
+    submitFormIsIdle,
+    submitFormStatus,
+  };
+};
+
+export const useSubmissions = (formId: string) => {
+  const {
+    data: submissions,
+    error: submissionsError,
+    isLoading: submissionsIsLoading,
+    isFetching: submissionsIsFetching,
+    isFetched: submissionsIsFetched,
+    isError: submissionsIsError,
+    status: submissionsStatus,
+  } = trpc.form.getSubmissions.useQuery({ formId });
+
+  return {
+    submissions,
+    submissionsError,
+    submissionsIsLoading,
+    submissionsIsFetching,
+    submissionsIsFetched,
+    submissionsIsError,
+    submissionsStatus,
+  };
+};
+
 export const useCreateField = () => {
   const utils = trpc.useUtils();
   const {

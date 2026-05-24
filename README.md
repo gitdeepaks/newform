@@ -330,3 +330,6 @@ The generated OpenAPI document is available at:
 - Workspace dependencies use the `workspace:*` protocol.
 - Keep shared code in `packages/*` and app-specific code in `apps/*`.
 - Keep dependency direction one-way: apps depend on packages, packages should not depend on apps.
+
+
+We need to follow this procedure DB -> service -> tRPC Procedure -> hook -> UI
