@@ -1,5 +1,5 @@
 import { formFieldService, formService } from "../../services";
-import { protectedProcedure, router } from "../../trpc";
+import { protectedProcedure, publicProcedure, router } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 import {
   createFieldInputSchema,
@@ -10,6 +10,8 @@ import {
   deleteFieldOutputSchema,
   getFieldsInputSchema,
   getFieldsOutputSchema,
+  getFormInputSchema,
+  getFormOutputSchema,
   listFormsInputSchema,
   listFormsOutputSchema,
   updateFieldInputSchema,
@@ -40,6 +42,21 @@ export const formRouter = router({
       });
 
       return { id };
+    }),
+
+  getForm: publicProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: getPath("/getForm"),
+        tags: TAGS,
+      },
+    })
+    .input(getFormInputSchema)
+    .output(getFormOutputSchema)
+    .query(async ({ input }) => {
+      const form = await formService.getFormById(input);
+      return form;
     }),
 
   listForms: protectedProcedure

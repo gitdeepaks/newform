@@ -1,9 +1,11 @@
 import { db, eq } from "@repo/database";
-import { formsTable } from "@repo/database/schema";
+import { formFieldsTable, formsTable } from "@repo/database/schema";
 import {
   createFormInputSchema,
+  getFormByIdInputSchema,
   listFromByUserIdInputSchema,
   type CreateFormInputSchemaType,
+  type GetFormByIdInputSchemaType,
   type ListFromByUserIdInputSchemaType,
 } from "./model";
 
@@ -44,6 +46,51 @@ class FormService {
       })
       .from(formsTable)
       .where(eq(formsTable.createdBy, userId));
+  }
+
+  public async getFormById(input: GetFormByIdInputSchemaType) {
+    const { formId } = await getFormByIdInputSchema.parseAsync(input);
+
+    const rows = await db
+      .select({
+        form: {
+          id: formsTable.id,
+          title: formsTable.title,
+          description: formsTable.description,
+        },
+        field: {
+          id: formFieldsTable.id,
+          label: formFieldsTable.label,
+          description: formFieldsTable.description,
+          labelKey: formFieldsTable.labelKey,
+          placeholder: formFieldsTable.placeholder,
+          isRequired: formFieldsTable.isRequired,
+          index: formFieldsTable.index,
+          type: formFieldsTable.type,
+          formId: formFieldsTable.formId,
+          createdAt: formFieldsTable.createdAt,
+          updatedAt: formFieldsTable.updatedAt,
+        },
+      })
+      .from(formsTable)
+      .leftJoin(formFieldsTable, eq(formFieldsTable.formId, formsTable.id))
+      .where(eq(formsTable.id, formId))
+      .orderBy(formFieldsTable.index);
+
+    const [firstRow] = rows;
+    if (!firstRow) {
+      throw new Error(`Form With ${formId} Not Found`);
+    }
+
+    const { form } = firstRow;
+    const fields = rows
+      .map((row) => row.field)
+      .filter((field): field is NonNullable<typeof field> => field !== null);
+
+    return {
+      ...form,
+      fields,
+    };
   }
 }
 

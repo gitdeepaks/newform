@@ -10,5 +10,10 @@ export const listFromByUserIdInputSchema = z.object({
   userId: z.string().describe("The id of the user who created the forms"),
 });
 
+export const getFormByIdInputSchema = z.object({
+  formId: z.string().describe("The id of the form"),
+});
+
 export type CreateFormInputSchemaType = z.infer<typeof createFormInputSchema>;
 export type ListFromByUserIdInputSchemaType = z.infer<typeof listFromByUserIdInputSchema>;
+export type GetFormByIdInputSchemaType = z.infer<typeof getFormByIdInputSchema>;

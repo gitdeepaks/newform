@@ -53,6 +53,28 @@ export const useForms = () => {
   };
 };
 
+export const useForm = (formId: string) => {
+  const {
+    data: form,
+    error: formError,
+    isLoading: formIsLoading,
+    isFetching: formIsFetching,
+    isFetched: formIsFetched,
+    isError: formIsError,
+    status: formStatus,
+  } = trpc.form.getForm.useQuery({ formId });
+
+  return {
+    form,
+    formError,
+    formIsLoading,
+    formIsFetching,
+    formIsFetched,
+    formIsError,
+    formStatus,
+  };
+};
+
 export const useCreateField = () => {
   const utils = trpc.useUtils();
   const {

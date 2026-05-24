@@ -23,6 +23,31 @@ export const listFormsOutputSchema = z.array(
 
 export const formFieldTypeSchema = z.enum(["TEXT", "NUMBER", "EMAIL", "YES_NO", "PASSWORD"]);
 
+export const formFieldSchema = z.object({
+  id: z.string().describe("The id of the form field"),
+  label: z.string().describe("The label of the form field"),
+  description: z.string().nullable().describe("The description of the form field"),
+  labelKey: z.string().describe("The stable key generated from the original label"),
+  placeholder: z.string().nullable().describe("The placeholder of the form field"),
+  isRequired: z.boolean().nullable().describe("Whether the form field is required"),
+  index: z.string().describe("The fractional index used to sort the form field"),
+  type: formFieldTypeSchema.describe("The type of the form field"),
+  formId: z.string().nullable().describe("The id of the form this field belongs to"),
+  createdAt: z.date().nullable().describe("The date the form field was created"),
+  updatedAt: z.date().nullable().describe("The date the form field was last updated"),
+});
+
+export const getFormInputSchema = z.object({
+  formId: z.string().describe("The id of the form"),
+});
+
+export const getFormOutputSchema = z.object({
+  id: z.string().describe("The id of the form"),
+  title: z.string().describe("The title of the form"),
+  description: z.string().nullable().describe("The description of the form"),
+  fields: z.array(formFieldSchema).describe("The fields belonging to the form"),
+});
+
 export const createFieldInputSchema = z.object({
   label: z.string().min(1).max(100).describe("The label of the form field"),
   description: z.string().optional().describe("The description of the form field"),
@@ -41,21 +66,7 @@ export const getFieldsInputSchema = z.object({
   formId: z.string().describe("The id of the form"),
 });
 
-export const getFieldsOutputSchema = z.array(
-  z.object({
-    id: z.string().describe("The id of the form field"),
-    label: z.string().describe("The label of the form field"),
-    description: z.string().nullable().describe("The description of the form field"),
-    labelKey: z.string().describe("The stable key generated from the original label"),
-    placeholder: z.string().nullable().describe("The placeholder of the form field"),
-    isRequired: z.boolean().nullable().describe("Whether the form field is required"),
-    index: z.string().describe("The fractional index used to sort the form field"),
-    type: formFieldTypeSchema.describe("The type of the form field"),
-    formId: z.string().nullable().describe("The id of the form this field belongs to"),
-    createdAt: z.date().nullable().describe("The date the form field was created"),
-    updatedAt: z.date().nullable().describe("The date the form field was last updated"),
-  }),
-);
+export const getFieldsOutputSchema = z.array(formFieldSchema);
 
 export const updateFieldInputSchema = z.object({
   id: z.string().describe("The id of the form field"),
