@@ -7,19 +7,64 @@ export const createFormInputSchema = z.object({
 
 export const createFormOutputSchema = z.object({
   id: z.string().describe("The id of the form"),
+  slug: z.string().describe("The slug of the form"),
 });
 
 export const listFormsInputSchema = z.undefined();
+
+export const formStatusSchema = z.enum(["draft", "published", "archived"]);
+export const formVisibilitySchema = z.enum(["public", "unlisted"]);
+export const slugSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(80)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 
 export const listFormsOutputSchema = z.array(
   z.object({
     id: z.string().describe("The id of the form"),
     title: z.string().describe("The title of the form"),
     description: z.string().nullable().describe("The description of the form"),
+    slug: z.string().describe("The slug of the form"),
+    status: z.string().describe("The status of the form"),
+    visibility: z.string().describe("The visibility of the form"),
+    publishedAt: z.date().nullable().describe("The date the form was published"),
     createdAt: z.date().nullable().describe("The date the form was created"),
     updatedAt: z.date().nullable().describe("The date the form was last updated"),
   }),
 );
+
+export const updateFormInputSchema = z.object({
+  formId: z.string().describe("The id of the form"),
+  title: z.string().min(1).max(55).optional().describe("The title of the form"),
+  description: z.string().max(300).nullable().optional().describe("The description of the form"),
+  thankYouTitle: z.string().min(1).max(120).optional().describe("The thank you title"),
+  thankYouMessage: z.string().min(1).max(300).optional().describe("The thank you message"),
+  expiresAt: z.date().nullable().optional().describe("The date the form expires"),
+  responseLimit: z.number().int().positive().nullable().optional().describe("The response limit"),
+});
+
+export const lifecycleFormIdInputSchema = z.object({
+  formId: z.string().describe("The id of the form"),
+});
+
+export const updateVisibilityInputSchema = lifecycleFormIdInputSchema.extend({
+  visibility: formVisibilitySchema.describe("The form visibility"),
+});
+
+export const updateSlugInputSchema = lifecycleFormIdInputSchema.extend({
+  slug: slugSchema.describe("The form slug"),
+});
+
+export const lifecycleOutputSchema = z.object({
+  id: z.string().describe("The id of the form"),
+});
+
+export const updateSlugOutputSchema = z.object({
+  id: z.string().describe("The id of the form"),
+  slug: z.string().describe("The updated slug"),
+});
 
 export const submissionValueSchema = z.object({
   formFieldId: z.string().describe("The id of the form field being answered"),
@@ -72,12 +117,36 @@ export const getFormInputSchema = z.object({
   formId: z.string().describe("The id of the form"),
 });
 
+export const getPublicFormBySlugInputSchema = z.object({
+  slug: slugSchema.describe("The public form slug"),
+});
+
 export const getFormOutputSchema = z.object({
   id: z.string().describe("The id of the form"),
   title: z.string().describe("The title of the form"),
   description: z.string().nullable().describe("The description of the form"),
+  slug: z.string().describe("The slug of the form"),
+  status: z.string().describe("The status of the form"),
+  visibility: z.string().describe("The visibility of the form"),
+  thankYouTitle: z.string().nullable().describe("The thank you title"),
+  thankYouMessage: z.string().nullable().describe("The thank you message"),
+  publishedAt: z.date().nullable().describe("The published date"),
+  expiresAt: z.date().nullable().describe("The expiration date"),
+  responseLimit: z.number().nullable().describe("The response limit"),
   fields: z.array(formFieldSchema).describe("The fields belonging to the form"),
 });
+
+export const listPublicFormsInputSchema = z.undefined();
+
+export const listPublicFormsOutputSchema = z.array(
+  z.object({
+    id: z.string().describe("The id of the form"),
+    title: z.string().describe("The title of the form"),
+    description: z.string().nullable().describe("The description of the form"),
+    slug: z.string().describe("The form slug"),
+    publishedAt: z.date().nullable().describe("The published date"),
+  }),
+);
 
 export const createFieldInputSchema = z.object({
   label: z.string().min(1).max(100).describe("The label of the form field"),

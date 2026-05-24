@@ -12,14 +12,23 @@ import {
   getFieldsOutputSchema,
   getFormInputSchema,
   getFormOutputSchema,
+  getPublicFormBySlugInputSchema,
   getSubmissionsInputSchema,
   getSubmissionsOutputSchema,
+  lifecycleFormIdInputSchema,
+  lifecycleOutputSchema,
+  listPublicFormsInputSchema,
+  listPublicFormsOutputSchema,
   listFormsInputSchema,
   listFormsOutputSchema,
   submitFormInputSchema,
   submitFormOutputSchema,
   updateFieldInputSchema,
   updateFieldOutputSchema,
+  updateFormInputSchema,
+  updateSlugInputSchema,
+  updateSlugOutputSchema,
+  updateVisibilityInputSchema,
 } from "./model";
 
 const TAGS = ["Form"];
@@ -39,13 +48,103 @@ export const formRouter = router({
     .output(createFormOutputSchema)
     .mutation(async ({ input, ctx }) => {
       const { title, description } = input;
-      const { id } = await formService.createForm({
+      const { id, slug } = await formService.createForm({
         title,
         description,
         createdBy: ctx.user.id,
       });
 
-      return { id };
+      return { id, slug };
+    }),
+
+  getFormForOwner: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: getPath("/getFormForOwner"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(getFormInputSchema)
+    .output(getFormOutputSchema)
+    .query(async ({ input, ctx }) => {
+      return formService.getFormByOwner({ formId: input.formId, userId: ctx.user.id });
+    }),
+
+  updateForm: protectedProcedure
+    .meta({
+      openapi: {
+        method: "PATCH",
+        path: getPath("/updateForm"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(updateFormInputSchema)
+    .output(lifecycleOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return formService.updateForm({ ...input, userId: ctx.user.id });
+    }),
+
+  publishForm: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: getPath("/publishForm"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(lifecycleFormIdInputSchema)
+    .output(updateSlugOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return formService.publishForm({ ...input, userId: ctx.user.id });
+    }),
+
+  unpublishForm: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: getPath("/unpublishForm"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(lifecycleFormIdInputSchema)
+    .output(lifecycleOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return formService.unpublishForm({ ...input, userId: ctx.user.id });
+    }),
+
+  updateVisibility: protectedProcedure
+    .meta({
+      openapi: {
+        method: "PATCH",
+        path: getPath("/updateVisibility"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(updateVisibilityInputSchema)
+    .output(lifecycleOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return formService.updateVisibility({ ...input, userId: ctx.user.id });
+    }),
+
+  updateSlug: protectedProcedure
+    .meta({
+      openapi: {
+        method: "PATCH",
+        path: getPath("/updateSlug"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(updateSlugInputSchema)
+    .output(updateSlugOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return formService.updateSlug({ ...input, userId: ctx.user.id });
     }),
 
   getForm: publicProcedure
@@ -61,6 +160,34 @@ export const formRouter = router({
     .query(async ({ input }) => {
       const form = await formService.getFormById(input);
       return form;
+    }),
+
+  getPublicFormBySlug: publicProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: getPath("/getPublicFormBySlug"),
+        tags: TAGS,
+      },
+    })
+    .input(getPublicFormBySlugInputSchema)
+    .output(getFormOutputSchema)
+    .query(async ({ input }) => {
+      return formService.getPublicFormBySlug(input);
+    }),
+
+  listPublicForms: publicProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: getPath("/listPublicForms"),
+        tags: TAGS,
+      },
+    })
+    .input(listPublicFormsInputSchema)
+    .output(listPublicFormsOutputSchema)
+    .query(async ({ input }) => {
+      return formService.listPublicForms(input);
     }),
 
   submitForm: publicProcedure

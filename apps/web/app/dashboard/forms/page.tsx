@@ -3,6 +3,7 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -35,7 +36,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateForm, useForms } from "@/hooks/api/form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowUpRightIcon, PlusIcon } from "lucide-react";
+import { ArrowUpRightIcon, CopyIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -84,6 +85,12 @@ export default function FormsPage() {
     }
   }
 
+  async function copyShareLink(slug: string) {
+    const url = `${window.location.origin}/f/${slug}`;
+    await navigator.clipboard.writeText(url);
+    toast.success("Share link copied");
+  }
+
   return (
     <SidebarProvider
       style={
@@ -128,9 +135,11 @@ export default function FormsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead className="hidden sm:table-cell">Status</TableHead>
+                      <TableHead className="hidden lg:table-cell">Visibility</TableHead>
                       <TableHead className="hidden md:table-cell">Description</TableHead>
                       <TableHead className="hidden sm:table-cell">Created</TableHead>
-                      <TableHead className="w-24 text-right">Action</TableHead>
+                      <TableHead className="w-44 text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -141,6 +150,14 @@ export default function FormsPage() {
                             {userForm.title}
                           </Link>
                         </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <Badge variant={userForm.status === "published" ? "default" : "secondary"}>
+                            {userForm.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <Badge variant="outline">{userForm.visibility}</Badge>
+                        </TableCell>
                         <TableCell className="hidden max-w-md truncate text-muted-foreground md:table-cell">
                           {userForm.description || "No description"}
                         </TableCell>
@@ -148,12 +165,25 @@ export default function FormsPage() {
                           {userForm.createdAt ? new Date(userForm.createdAt).toLocaleDateString() : "-"}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button asChild variant="ghost" size="sm">
-                            <Link href={`/dashboard/forms/${userForm.id}`}>
-                              Builder
-                              <ArrowUpRightIcon />
-                            </Link>
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            {userForm.status === "published" ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => copyShareLink(userForm.slug)}
+                              >
+                                <CopyIcon />
+                                <span className="sr-only">Copy share link</span>
+                              </Button>
+                            ) : null}
+                            <Button asChild variant="ghost" size="sm">
+                              <Link href={`/dashboard/forms/${userForm.id}`}>
+                                Builder
+                                <ArrowUpRightIcon />
+                              </Link>
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

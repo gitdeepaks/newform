@@ -3,6 +3,7 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -35,10 +36,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateField, useDeleteField, useFields, useUpdateField } from "@/hooks/api/form";
+import {
+  useCreateField,
+  useDeleteField,
+  useFields,
+  useOwnerForm,
+  usePublishForm,
+  useUnpublishForm,
+  useUpdateField,
+  useUpdateForm,
+  useUpdateSlug,
+  useUpdateVisibility,
+} from "@/hooks/api/form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { use, useState } from "react";
+import { CopyIcon, ExternalLinkIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import Link from "next/link";
+import { use, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -54,6 +67,22 @@ const fieldSchema = z.object({
 });
 
 type FieldValues = z.infer<typeof fieldSchema>;
+
+const settingsSchema = z.object({
+  title: z.string().trim().min(1, "Title is required").max(55),
+  description: z.string().trim().max(300).optional(),
+  slug: z
+    .string()
+    .trim()
+    .min(3, "Slug must be at least 3 characters")
+    .max(80)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens"),
+  visibility: z.enum(["public", "unlisted"]),
+  thankYouTitle: z.string().trim().min(1).max(120),
+  thankYouMessage: z.string().trim().min(1).max(300),
+});
+
+type SettingsValues = z.infer<typeof settingsSchema>;
 
 type FormBuilderPageProps = {
   params: Promise<{
@@ -78,10 +107,17 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const { form: ownerForm, formError: ownerFormError, formIsLoading: ownerFormIsLoading } =
+    useOwnerForm(id);
   const { fields, fieldsError, fieldsIsLoading } = useFields(id);
   const { createFieldAsync, createFieldError, createFieldIsPending } = useCreateField();
   const { updateFieldAsync, updateFieldError, updateFieldIsPending } = useUpdateField();
   const { deleteFieldAsync, deleteFieldIsPending } = useDeleteField();
+  const { updateFormAsync, updateFormIsPending } = useUpdateForm();
+  const { updateSlugAsync, updateSlugIsPending } = useUpdateSlug();
+  const { updateVisibilityAsync, updateVisibilityIsPending } = useUpdateVisibility();
+  const { publishFormAsync, publishFormIsPending } = usePublishForm();
+  const { unpublishFormAsync, unpublishFormIsPending } = useUnpublishForm();
 
   const createForm = useForm<FieldValues>({
     resolver: zodResolver(fieldSchema),
@@ -92,6 +128,30 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
     resolver: zodResolver(fieldSchema),
     defaultValues: defaultFieldValues,
   });
+
+  const settingsForm = useForm<SettingsValues>({
+    resolver: zodResolver(settingsSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      slug: "",
+      visibility: "unlisted",
+      thankYouTitle: "Thanks for your response",
+      thankYouMessage: "Your submission has been recorded.",
+    },
+  });
+
+  useEffect(() => {
+    if (!ownerForm) return;
+    settingsForm.reset({
+      title: ownerForm.title,
+      description: ownerForm.description ?? "",
+      slug: ownerForm.slug,
+      visibility: ownerForm.visibility === "public" ? "public" : "unlisted",
+      thankYouTitle: ownerForm.thankYouTitle ?? "Thanks for your response",
+      thankYouMessage: ownerForm.thankYouMessage ?? "Your submission has been recorded.",
+    });
+  }, [ownerForm, settingsForm]);
 
   const createIsSubmitting = createForm.formState.isSubmitting || createFieldIsPending;
   const updateIsSubmitting = editForm.formState.isSubmitting || updateFieldIsPending;
@@ -163,6 +223,61 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
     }
   }
 
+  async function onSaveSettings(values: SettingsValues) {
+    try {
+      await updateFormAsync({
+        formId: id,
+        title: values.title,
+        description: values.description || null,
+        thankYouTitle: values.thankYouTitle,
+        thankYouMessage: values.thankYouMessage,
+      });
+      if (values.slug !== ownerForm?.slug) {
+        await updateSlugAsync({ formId: id, slug: values.slug });
+      }
+      if (values.visibility !== ownerForm?.visibility) {
+        await updateVisibilityAsync({ formId: id, visibility: values.visibility });
+      }
+      toast.success("Form settings saved");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save settings";
+      toast.error(message);
+    }
+  }
+
+  async function onPublish() {
+    try {
+      await publishFormAsync({ formId: id });
+      toast.success("Form published");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to publish form";
+      toast.error(message);
+    }
+  }
+
+  async function onUnpublish() {
+    try {
+      await unpublishFormAsync({ formId: id });
+      toast.success("Form unpublished");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to unpublish form";
+      toast.error(message);
+    }
+  }
+
+  async function copyShareLink() {
+    if (!ownerForm?.slug) return;
+    await navigator.clipboard.writeText(`${window.location.origin}/f/${ownerForm.slug}`);
+    toast.success("Share link copied");
+  }
+
+  const lifecycleIsPending =
+    updateFormIsPending ||
+    updateSlugIsPending ||
+    updateVisibilityIsPending ||
+    publishFormIsPending ||
+    unpublishFormIsPending;
+
   return (
     <SidebarProvider
       style={
@@ -186,6 +301,166 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
               Add field
             </Button>
           </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle>Form settings</CardTitle>
+                  <CardDescription>Manage publishing, visibility, and the public share URL.</CardDescription>
+                </div>
+                {ownerForm ? (
+                  <div className="flex gap-2">
+                    <Badge variant={ownerForm.status === "published" ? "default" : "secondary"}>
+                      {ownerForm.status}
+                    </Badge>
+                    <Badge variant="outline">{ownerForm.visibility}</Badge>
+                  </div>
+                ) : null}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {ownerFormIsLoading ? (
+                <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Spinner />
+                  Loading settings...
+                </div>
+              ) : ownerFormError ? (
+                <Alert variant="destructive">
+                  <AlertDescription>{ownerFormError.message}</AlertDescription>
+                </Alert>
+              ) : ownerForm ? (
+                <Form {...settingsForm}>
+                  <form
+                    onSubmit={settingsForm.handleSubmit(onSaveSettings)}
+                    className="grid gap-4 lg:grid-cols-2"
+                  >
+                    <FormField
+                      control={settingsForm.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Title</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={lifecycleIsPending} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={settingsForm.control}
+                      name="slug"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Slug</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={lifecycleIsPending} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={settingsForm.control}
+                      name="visibility"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Visibility</FormLabel>
+                          <FormControl>
+                            <NativeSelect
+                              value={field.value}
+                              disabled={lifecycleIsPending}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            >
+                              <NativeSelectOption value="public">Public</NativeSelectOption>
+                              <NativeSelectOption value="unlisted">Unlisted</NativeSelectOption>
+                            </NativeSelect>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={settingsForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={lifecycleIsPending} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={settingsForm.control}
+                      name="thankYouTitle"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Thank-you title</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={lifecycleIsPending} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={settingsForm.control}
+                      name="thankYouMessage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Thank-you message</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={lifecycleIsPending} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex flex-col gap-2 lg:col-span-2 sm:flex-row sm:justify-between">
+                      <div className="flex gap-2">
+                        <Button type="submit" disabled={lifecycleIsPending}>
+                          {lifecycleIsPending ? <Spinner /> : null}
+                          Save settings
+                        </Button>
+                        {ownerForm.status === "published" ? (
+                          <Button type="button" variant="outline" disabled={lifecycleIsPending} onClick={onUnpublish}>
+                            Unpublish
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={lifecycleIsPending || fieldsIsLoading || !fields || fields.length === 0}
+                            onClick={onPublish}
+                          >
+                            Publish
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {ownerForm.status === "published" ? (
+                          <Button type="button" variant="secondary" onClick={copyShareLink}>
+                            <CopyIcon />
+                            Copy link
+                          </Button>
+                        ) : null}
+                        <Button asChild type="button" variant="ghost">
+                          <Link href={`/f/${ownerForm.slug}`} target="_blank">
+                            <ExternalLinkIcon />
+                            Open public page
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </form>
+                </Form>
+              ) : null}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

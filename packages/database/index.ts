@@ -4,5 +4,5 @@ import { env } from "./env";
 
 export const db = drizzle(env.DATABASE_URL);
 export * from "drizzle-orm/node-postgres";
-export { eq } from "drizzle-orm";
+export { and, count, eq, ne } from "drizzle-orm";
 export default db;

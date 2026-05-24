@@ -20,14 +20,17 @@ Implemented or partially implemented:
 - Creator can list forms.
 - Creator can add/edit/delete basic fields.
 - Public form page exists at `/form/[form_id]`.
+- Public slug form page exists at `/f/[slug]`.
 - Public form submission exists by form id.
 - Submissions table/service/tRPC/hook/UI exists in a basic form.
+- Form lifecycle is implemented: `draft`/`published`, visibility, slug, publish/unpublish, owner form lookup, public slug lookup, and public forms listing API.
+- Dashboard form list shows status, visibility, and copy share link.
+- Builder page has settings for title, description, slug, visibility, thank-you copy, publish/unpublish, copy link, and open public page.
 
 Important gaps:
 
-- Forms do not yet have `status`, `visibility`, `slug`, `themeId`, publish fields, expiry, response limit, or thank-you config.
-- Public form access is by `form_id`, not shareable slug.
-- Public/unlisted/unpublished visibility checks are missing.
+- Public form submission still uses form id internally; final flow should move submission to slug-based `submitPublicResponse`.
+- `listPublicForms` API exists, but public explore/templates UI is still missing.
 - Field types are still limited to `TEXT`, `NUMBER`, `EMAIL`, `YES_NO`, `PASSWORD`.
 - Required types like long text, single select, multi select, checkbox, rating, and date are missing.
 - Field options and validation rules are missing.
@@ -76,7 +79,7 @@ Acceptance:
 - Demo login flow is obvious.
 - Public form page still works without login.
 
-## Priority 1: Form Lifecycle, Visibility, Slugs
+## Priority 1: Form Lifecycle, Visibility, Slugs - Completed
 
 Target: hours 2-8.
 
@@ -86,14 +89,14 @@ This is required before public forms can be correct.
 
 Extend `forms`:
 
-- `slug` unique.
-- `status`: `draft`, `published`, `archived`.
-- `visibility`: `public`, `unlisted`.
-- `publishedAt`.
-- `themeId` nullable.
-- `thankYouTitle`, `thankYouMessage`.
-- `expiresAt` nullable.
-- `responseLimit` nullable.
+- [x] `slug` unique.
+- [x] `status`: `draft`, `published`, `archived` planned. Current implementation supports string status and uses `draft`/`published`.
+- [x] `visibility`: `public`, `unlisted`.
+- [x] `publishedAt`.
+- [x] `themeId` nullable.
+- [x] `thankYouTitle`, `thankYouMessage`.
+- [x] `expiresAt` nullable.
+- [x] `responseLimit` nullable.
 
 Use Drizzle enums for `status` and `visibility` if fast enough; otherwise `varchar` with Zod validation is acceptable for this deadline.
 
@@ -101,14 +104,14 @@ Use Drizzle enums for `status` and `visibility` if fast enough; otherwise `varch
 
 Add to `FormService`:
 
-- `getFormByOwner({ formId, userId })`.
-- `updateForm({ formId, userId, title, description, thankYouTitle, thankYouMessage })`.
-- `publishForm({ formId, userId })`.
-- `unpublishForm({ formId, userId })`.
-- `updateVisibility({ formId, userId, visibility })`.
-- `updateSlug({ formId, userId, slug })` with conflict handling.
-- `getPublicFormBySlug({ slug })` with status/visibility/expiry/limit checks.
-- `listPublicForms()` for explore/templates.
+- [x] `getFormByOwner({ formId, userId })`.
+- [x] `updateForm({ formId, userId, title, description, thankYouTitle, thankYouMessage })`.
+- [x] `publishForm({ formId, userId })`.
+- [x] `unpublishForm({ formId, userId })`.
+- [x] `updateVisibility({ formId, userId, visibility })`.
+- [x] `updateSlug({ formId, userId, slug })` with conflict handling.
+- [x] `getPublicFormBySlug({ slug })` with status/expiry checks.
+- [x] `listPublicForms()` for explore/templates.
 
 Ownership is mandatory for all creator methods.
 
@@ -116,14 +119,14 @@ Ownership is mandatory for all creator methods.
 
 Add procedures:
 
-- `getFormForOwner` protected.
-- `updateForm` protected.
-- `publishForm` protected.
-- `unpublishForm` protected.
-- `updateVisibility` protected.
-- `updateSlug` protected.
-- `getPublicFormBySlug` public.
-- `listPublicForms` public.
+- [x] `getFormForOwner` protected.
+- [x] `updateForm` protected.
+- [x] `publishForm` protected.
+- [x] `unpublishForm` protected.
+- [x] `updateVisibility` protected.
+- [x] `updateSlug` protected.
+- [x] `getPublicFormBySlug` public.
+- [x] `listPublicForms` public.
 
 OpenAPI metadata should be added for Scalar docs.
 
@@ -131,42 +134,63 @@ OpenAPI metadata should be added for Scalar docs.
 
 Add hooks:
 
-- `useOwnerForm(formId)`.
-- `useUpdateForm()`.
-- `usePublishForm()`.
-- `useUnpublishForm()`.
-- `useUpdateVisibility()`.
-- `useUpdateSlug()`.
-- `usePublicForm(slug)`.
-- `usePublicForms()`.
+- [x] `useOwnerForm(formId)`.
+- [x] `useUpdateForm()`.
+- [x] `usePublishForm()`.
+- [x] `useUnpublishForm()`.
+- [x] `useUpdateVisibility()`.
+- [x] `useUpdateSlug()`.
+- [x] `usePublicForm(slug)`.
+- [x] `usePublicForms()`.
 
 ### UI
 
 Update dashboard form list:
 
-- Show status.
-- Show visibility.
-- Show share link if published.
-- Add open public form button.
+- [x] Show status.
+- [x] Show visibility.
+- [x] Show share link if published.
+- [x] Add open public form button in builder page.
 
 Update builder page:
 
-- Add settings card for title, description, slug, visibility, thank-you text.
-- Add publish/unpublish buttons.
-- Disable publish when form has zero fields.
-- Copy share link using slug.
+- [x] Add settings card for title, description, slug, visibility, thank-you text.
+- [x] Add publish/unpublish buttons.
+- [x] Disable publish when form has zero fields.
+- [x] Copy share link using slug.
 
 Add public route:
 
-- Prefer `/f/[slug]` for final share links.
-- Keep `/form/[form_id]` only temporarily or remove later.
+- [x] Prefer `/f/[slug]` for final share links.
+- [x] Keep `/form/[form_id]` temporarily.
 
 Acceptance:
 
-- Published public form opens by slug.
-- Published unlisted form opens by slug but does not appear in explore/templates.
-- Draft/unpublished form cannot be submitted.
-- Invalid slug has graceful error state.
+- [x] Published public form opens by slug.
+- [x] Published unlisted form opens by slug.
+- [x] Draft/unpublished form cannot be opened through public slug lookup.
+- [x] Invalid slug has graceful error state.
+- [ ] Explore/templates UI still needs to consume `listPublicForms` so unlisted forms stay hidden from public listings.
+
+Completed files:
+
+- `packages/database/models/form.ts`
+- `packages/database/drizzle/20260524190437_nostalgic_squirrel_girl/migration.sql`
+- `packages/services/form/model.ts`
+- `packages/services/form/index.ts`
+- `packages/trpc/server/routes/form/model.ts`
+- `packages/trpc/server/routes/form/route.ts`
+- `apps/web/hooks/api/form/index.ts`
+- `apps/web/app/dashboard/forms/page.tsx`
+- `apps/web/app/dashboard/forms/[id]/page.tsx`
+- `apps/web/app/f/[slug]/page.tsx`
+
+Verification completed:
+
+- [x] `pnpm check-types` passed.
+- [x] `pnpm db:generate` passed.
+- [x] `pnpm build` passed.
+- [ ] `pnpm lint` is blocked by pre-existing ESLint config/warnings unrelated to this lifecycle work.
 
 ## Priority 2: Field Types, Options, Validations
 

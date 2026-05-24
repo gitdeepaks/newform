@@ -75,6 +75,164 @@ export const useForm = (formId: string) => {
   };
 };
 
+export const useOwnerForm = (formId: string) => {
+  const {
+    data: form,
+    error: formError,
+    isLoading: formIsLoading,
+    isFetching: formIsFetching,
+    isFetched: formIsFetched,
+    isError: formIsError,
+    status: formStatus,
+  } = trpc.form.getFormForOwner.useQuery({ formId });
+
+  return {
+    form,
+    formError,
+    formIsLoading,
+    formIsFetching,
+    formIsFetched,
+    formIsError,
+    formStatus,
+  };
+};
+
+export const usePublicForm = (slug: string) => {
+  const {
+    data: form,
+    error: formError,
+    isLoading: formIsLoading,
+    isFetching: formIsFetching,
+    isFetched: formIsFetched,
+    isError: formIsError,
+    status: formStatus,
+  } = trpc.form.getPublicFormBySlug.useQuery({ slug });
+
+  return {
+    form,
+    formError,
+    formIsLoading,
+    formIsFetching,
+    formIsFetched,
+    formIsError,
+    formStatus,
+  };
+};
+
+export const usePublicForms = () => {
+  const {
+    data: forms,
+    error: formsError,
+    isLoading: formsIsLoading,
+    isFetching: formsIsFetching,
+    isFetched: formsIsFetched,
+    isError: formsIsError,
+    status: formsStatus,
+  } = trpc.form.listPublicForms.useQuery();
+
+  return {
+    forms,
+    formsError,
+    formsIsLoading,
+    formsIsFetching,
+    formsIsFetched,
+    formsIsError,
+    formsStatus,
+  };
+};
+
+export const useUpdateForm = () => {
+  const utils = trpc.useUtils();
+  const mutation = trpc.form.updateForm.useMutation({
+    onSuccess: async () => {
+      await utils.form.getFormForOwner.invalidate();
+      await utils.form.listForms.invalidate();
+    },
+  });
+
+  return {
+    updateFormAsync: mutation.mutateAsync,
+    updateForm: mutation.mutate,
+    updateFormError: mutation.error,
+    updateFormIsPending: mutation.isPending,
+  };
+};
+
+export const usePublishForm = () => {
+  const utils = trpc.useUtils();
+  const mutation = trpc.form.publishForm.useMutation({
+    onSuccess: async () => {
+      await utils.form.getFormForOwner.invalidate();
+      await utils.form.listForms.invalidate();
+      await utils.form.getPublicFormBySlug.invalidate();
+      await utils.form.listPublicForms.invalidate();
+    },
+  });
+
+  return {
+    publishFormAsync: mutation.mutateAsync,
+    publishForm: mutation.mutate,
+    publishFormError: mutation.error,
+    publishFormIsPending: mutation.isPending,
+  };
+};
+
+export const useUnpublishForm = () => {
+  const utils = trpc.useUtils();
+  const mutation = trpc.form.unpublishForm.useMutation({
+    onSuccess: async () => {
+      await utils.form.getFormForOwner.invalidate();
+      await utils.form.listForms.invalidate();
+      await utils.form.getPublicFormBySlug.invalidate();
+      await utils.form.listPublicForms.invalidate();
+    },
+  });
+
+  return {
+    unpublishFormAsync: mutation.mutateAsync,
+    unpublishForm: mutation.mutate,
+    unpublishFormError: mutation.error,
+    unpublishFormIsPending: mutation.isPending,
+  };
+};
+
+export const useUpdateVisibility = () => {
+  const utils = trpc.useUtils();
+  const mutation = trpc.form.updateVisibility.useMutation({
+    onSuccess: async () => {
+      await utils.form.getFormForOwner.invalidate();
+      await utils.form.listForms.invalidate();
+      await utils.form.listPublicForms.invalidate();
+    },
+  });
+
+  return {
+    updateVisibilityAsync: mutation.mutateAsync,
+    updateVisibility: mutation.mutate,
+    updateVisibilityError: mutation.error,
+    updateVisibilityIsPending: mutation.isPending,
+  };
+};
+
+export const useUpdateSlug = () => {
+  const utils = trpc.useUtils();
+  const mutation = trpc.form.updateSlug.useMutation({
+    onSuccess: async () => {
+      await utils.form.getFormForOwner.invalidate();
+      await utils.form.listForms.invalidate();
+      await utils.form.getPublicFormBySlug.invalidate();
+      await utils.form.listPublicForms.invalidate();
+    },
+  });
+
+  return {
+    updateSlugAsync: mutation.mutateAsync,
+    updateSlug: mutation.mutate,
+    updateSlugError: mutation.error,
+    updateSlugIsPending: mutation.isPending,
+  };
+};
+
 export const useSubmitForm = () => {
   const {
     mutateAsync: submitFormAsync,
