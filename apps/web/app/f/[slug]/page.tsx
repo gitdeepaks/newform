@@ -9,7 +9,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import { usePublicForm, useSubmitForm } from "@/hooks/api/form";
+import { usePublicForm, useSubmitPublicResponse } from "@/hooks/api/form";
 import { use, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -60,9 +60,10 @@ const isMissingRequiredAnswer = (field: Field, answer: PublicAnswer | undefined)
 export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) {
   const { slug } = use(params);
   const { form, formError, formIsLoading } = usePublicForm(slug);
-  const { submitFormAsync, submitFormIsPending } = useSubmitForm();
+  const { submitPublicResponseAsync, submitPublicResponseIsPending } = useSubmitPublicResponse();
 
   const [answers, setAnswers] = useState<PublicAnswers>({});
+  const [honeypot, setHoneypot] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   function setAnswer(fieldId: string, value: PublicAnswer) {
@@ -91,8 +92,9 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
     }
 
     try {
-      await submitFormAsync({
-        formId: form.id,
+      await submitPublicResponseAsync({
+        slug,
+        honeypot,
         values: form.fields.flatMap((field) => {
           const answer = answers[field.id];
           if (answer === undefined) return [];
@@ -154,7 +156,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                           id={field.id}
                           placeholder={field.placeholder ?? undefined}
                           required={field.isRequired ?? false}
-                          disabled={submitFormIsPending}
+                          disabled={submitPublicResponseIsPending}
                           value={getStringAnswer(answers, field.id)}
                           onChange={(event) => setAnswer(field.id, event.target.value)}
                         />
@@ -164,7 +166,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                         <NativeSelect
                           id={field.id}
                           value={getStringAnswer(answers, field.id)}
-                          disabled={submitFormIsPending}
+                          disabled={submitPublicResponseIsPending}
                           onChange={(event) => setAnswer(field.id, event.target.value)}
                         >
                           <NativeSelectOption value="">Select an option</NativeSelectOption>
@@ -182,7 +184,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                             <label key={option.id} className="flex items-center gap-2 text-sm">
                               <input
                                 type="checkbox"
-                                disabled={submitFormIsPending}
+                                disabled={submitPublicResponseIsPending}
                                 checked={getArrayAnswer(answers, field.id).includes(option.value)}
                                 onChange={(event) => toggleArrayAnswer(field.id, option.value, event.target.checked)}
                               />
@@ -198,7 +200,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                           <Switch
                             id={field.id}
                             checked={answers[field.id] === true}
-                            disabled={submitFormIsPending}
+                            disabled={submitPublicResponseIsPending}
                             onCheckedChange={(checked) => setAnswer(field.id, checked)}
                           />
                         </div>
@@ -215,7 +217,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                                 type="button"
                                 variant={selected ? "default" : "outline"}
                                 size="sm"
-                                disabled={submitFormIsPending}
+                                disabled={submitPublicResponseIsPending}
                                 onClick={() => setAnswer(field.id, value)}
                               >
                                 {value}
@@ -231,7 +233,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                           type={inputTypeMap[field.type]}
                           placeholder={field.placeholder ?? undefined}
                           required={field.isRequired ?? false}
-                          disabled={submitFormIsPending}
+                          disabled={submitPublicResponseIsPending}
                           min={field.type === "DATE" ? field.validation?.dateMin : field.type === "NUMBER" ? field.validation?.min : undefined}
                           max={field.type === "DATE" ? field.validation?.dateMax : field.type === "NUMBER" ? field.validation?.max : undefined}
                           minLength={field.validation?.minLength}
@@ -243,8 +245,16 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                     </div>
                   ))}
 
-                  <Button type="submit" className="w-full" disabled={submitFormIsPending}>
-                    {submitFormIsPending ? <Spinner /> : null}
+                  <input
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="hidden"
+                    value={honeypot}
+                    onChange={(event) => setHoneypot(event.target.value)}
+                  />
+
+                  <Button type="submit" className="w-full" disabled={submitPublicResponseIsPending}>
+                    {submitPublicResponseIsPending ? <Spinner /> : null}
                     Submit
                   </Button>
                 </form>

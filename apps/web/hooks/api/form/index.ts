@@ -257,6 +257,36 @@ export const useSubmitForm = () => {
   };
 };
 
+export const useSubmitPublicResponse = () => {
+  const utils = trpc.useUtils();
+  const {
+    mutateAsync: submitPublicResponseAsync,
+    mutate: submitPublicResponse,
+    error: submitPublicResponseError,
+    isPending: submitPublicResponseIsPending,
+    isSuccess: submitPublicResponseIsSuccess,
+    isError: submitPublicResponseIsError,
+    isIdle: submitPublicResponseIsIdle,
+    status: submitPublicResponseStatus,
+  } = trpc.form.submitPublicResponse.useMutation({
+    onSuccess: async () => {
+      await utils.form.getPublicFormBySlug.invalidate();
+      await utils.form.getSubmissions.invalidate();
+    },
+  });
+
+  return {
+    submitPublicResponseAsync,
+    submitPublicResponse,
+    submitPublicResponseError,
+    submitPublicResponseIsPending,
+    submitPublicResponseIsSuccess,
+    submitPublicResponseIsError,
+    submitPublicResponseIsIdle,
+    submitPublicResponseStatus,
+  };
+};
+
 export const useSubmissions = (formId: string) => {
   const {
     data: submissions,
