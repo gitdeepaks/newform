@@ -174,7 +174,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
         email: values.email,
         password: values.password,
       });
-      router.push("/dashboard");
+      router.replace("/dashboard");
       toast.success("Account created successfully");
       form.reset();
     } catch (error) {

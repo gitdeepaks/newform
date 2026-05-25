@@ -48,7 +48,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       });
 
       if (id) {
-        router.push("/dashboard");
+        router.replace("/dashboard");
         toast.success("Login successful");
       }
     } catch {

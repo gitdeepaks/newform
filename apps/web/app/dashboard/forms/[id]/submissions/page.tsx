@@ -1,6 +1,7 @@
 "use client";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { AuthGate } from "@/components/auth/auth-gate";
 import { SiteHeader } from "@/components/site-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -91,14 +92,15 @@ export default function SubmissionsPage({ params }: SubmissionsPageProps) {
   };
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as React.CSSProperties
-      }
-    >
+    <AuthGate mode="auth">
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 72)",
+            "--header-height": "calc(var(--spacing) * 12)",
+          } as React.CSSProperties
+        }
+      >
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
@@ -212,6 +214,7 @@ export default function SubmissionsPage({ params }: SubmissionsPageProps) {
           </Card>
         </div>
       </SidebarInset>
-    </SidebarProvider>
+      </SidebarProvider>
+    </AuthGate>
   );
 }
