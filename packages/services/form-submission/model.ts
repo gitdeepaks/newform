@@ -38,6 +38,23 @@ export const getSubmissionsByFormIdInputSchema = z.object({
   userId: z.string().describe("The id of the user requesting submissions"),
 });
 
+export const listResponsesInputSchema = z.object({
+  formId: z.string(),
+  userId: z.string(),
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(20),
+});
+
+export const getFormAnalyticsInputSchema = z.object({
+  formId: z.string(),
+  userId: z.string(),
+});
+
+export const exportResponsesCsvInputSchema = z.object({
+  formId: z.string(),
+  userId: z.string(),
+});
+
 export type CreateSubmissionInputSchemaType = z.infer<typeof createSubmissionInputSchema>;
 export type SubmitPublicResponseInputSchemaType = z.infer<
   typeof submitPublicResponseInputSchema
@@ -45,3 +62,6 @@ export type SubmitPublicResponseInputSchemaType = z.infer<
 export type GetSubmissionsByFormIdInputSchemaType = z.infer<
   typeof getSubmissionsByFormIdInputSchema
 >;
+export type ListResponsesInputSchemaType = z.infer<typeof listResponsesInputSchema>;
+export type GetFormAnalyticsInputSchemaType = z.infer<typeof getFormAnalyticsInputSchema>;
+export type ExportResponsesCsvInputSchemaType = z.infer<typeof exportResponsesCsvInputSchema>;

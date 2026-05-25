@@ -105,6 +105,89 @@ export const getSubmissionsOutputSchema = z.array(
   }),
 );
 
+export const listResponsesInputSchema = z.object({
+  formId: z.string().describe("The id of the form whose responses to fetch"),
+  page: z.number().int().min(1).default(1).describe("The response page number"),
+  pageSize: z.number().int().min(1).max(100).default(20).describe("The number of responses per page"),
+});
+
+const responseMetadataSchema = z
+  .object({
+    ip: z.string().optional(),
+    userAgent: z.string().optional(),
+    slug: z.string().optional(),
+  })
+  .nullable();
+
+export const listResponsesOutputSchema = z.object({
+  fields: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      type: z.string(),
+      options: z.array(z.object({ id: z.string(), label: z.string(), value: z.string() })).nullable(),
+      validation: z
+        .object({
+          minLength: z.number().int().nonnegative().optional(),
+          maxLength: z.number().int().positive().optional(),
+          min: z.number().optional(),
+          max: z.number().optional(),
+          ratingMax: z.number().int().optional(),
+          dateMin: z.string().optional(),
+          dateMax: z.string().optional(),
+        })
+        .nullable(),
+    }),
+  ),
+  responses: z.array(
+    z.object({
+      id: z.string(),
+      respondentEmail: z.string().nullable(),
+      values: z.array(submissionValueSchema).nullable(),
+      metadata: responseMetadataSchema,
+      submittedAt: z.date().nullable(),
+      createdAt: z.date().nullable(),
+    }),
+  ),
+  pagination: z.object({
+    page: z.number(),
+    pageSize: z.number(),
+    total: z.number(),
+    totalPages: z.number(),
+  }),
+});
+
+export const getFormAnalyticsInputSchema = z.object({
+  formId: z.string().describe("The id of the form whose analytics to fetch"),
+});
+
+export const getFormAnalyticsOutputSchema = z.object({
+  totalResponses: z.number(),
+  totalSubmissions: z.number(),
+  totalViews: z.number(),
+  completionRate: z.number(),
+  submissionsByDay: z.array(z.object({ date: z.string(), count: z.number() })),
+  fieldBreakdown: z.array(
+    z.object({
+      fieldId: z.string(),
+      label: z.string(),
+      type: z.string(),
+      responseCount: z.number(),
+      options: z.array(z.object({ label: z.string(), value: z.string(), count: z.number() })).optional(),
+      averageRating: z.number().optional(),
+    }),
+  ),
+});
+
+export const exportResponsesCsvInputSchema = z.object({
+  formId: z.string().describe("The id of the form whose responses to export"),
+});
+
+export const exportResponsesCsvOutputSchema = z.object({
+  filename: z.string(),
+  csv: z.string(),
+});
+
 export const formFieldTypeSchema = z.enum([
   "SHORT_TEXT",
   "LONG_TEXT",

@@ -8,6 +8,10 @@ import {
   createFormOutputSchema,
   deleteFieldInputSchema,
   deleteFieldOutputSchema,
+  exportResponsesCsvInputSchema,
+  exportResponsesCsvOutputSchema,
+  getFormAnalyticsInputSchema,
+  getFormAnalyticsOutputSchema,
   getFieldsInputSchema,
   getFieldsOutputSchema,
   getFormInputSchema,
@@ -17,6 +21,8 @@ import {
   getSubmissionsOutputSchema,
   lifecycleFormIdInputSchema,
   lifecycleOutputSchema,
+  listResponsesInputSchema,
+  listResponsesOutputSchema,
   listPublicFormsInputSchema,
   listPublicFormsOutputSchema,
   listFormsInputSchema,
@@ -241,6 +247,51 @@ export const formRouter = router({
         userId: ctx.user.id,
       });
       return submissions;
+    }),
+
+  listResponses: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: getPath("/listResponses"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(listResponsesInputSchema)
+    .output(listResponsesOutputSchema)
+    .query(async ({ input, ctx }) => {
+      return formSubmissionService.listResponses({ ...input, userId: ctx.user.id });
+    }),
+
+  getFormAnalytics: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: getPath("/getFormAnalytics"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(getFormAnalyticsInputSchema)
+    .output(getFormAnalyticsOutputSchema)
+    .query(async ({ input, ctx }) => {
+      return formSubmissionService.getFormAnalytics({ ...input, userId: ctx.user.id });
+    }),
+
+  exportResponsesCsv: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: getPath("/exportResponsesCsv"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(exportResponsesCsvInputSchema)
+    .output(exportResponsesCsvOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return formSubmissionService.exportResponsesCsv({ ...input, userId: ctx.user.id });
     }),
 
   listForms: protectedProcedure

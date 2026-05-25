@@ -40,6 +40,7 @@ import {
   useCreateField,
   useDeleteField,
   useFields,
+  useFormAnalytics,
   useOwnerForm,
   usePublishForm,
   useUnpublishForm,
@@ -223,6 +224,7 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
   const { form: ownerForm, formError: ownerFormError, formIsLoading: ownerFormIsLoading } =
     useOwnerForm(id);
   const { fields, fieldsError, fieldsIsLoading } = useFields(id);
+  const { analytics, analyticsError, analyticsIsLoading } = useFormAnalytics(id);
   const { createFieldAsync, createFieldError, createFieldIsPending } = useCreateField();
   const { updateFieldAsync, updateFieldError, updateFieldIsPending } = useUpdateField();
   const { deleteFieldAsync, deleteFieldIsPending } = useDeleteField();
@@ -424,6 +426,41 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
               Add field
             </Button>
           </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total responses</CardDescription>
+                <CardTitle className="text-3xl">{analytics?.totalResponses ?? 0}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Submissions</CardDescription>
+                <CardTitle className="text-3xl">{analytics?.totalSubmissions ?? 0}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Views</CardDescription>
+                <CardTitle className="text-3xl">{analytics?.totalViews ?? 0}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Completion rate</CardDescription>
+                <CardTitle className="text-3xl">
+                  {Math.round(analytics?.completionRate ?? 0)}%
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+
+          {analyticsError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{analyticsError.message}</AlertDescription>
+            </Alert>
+          ) : null}
 
           <Card>
             <CardHeader>
@@ -658,6 +695,58 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
                     <PlusIcon />
                     Add field
                   </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Field breakdown</CardTitle>
+              <CardDescription>Quick response counts by field.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {analyticsIsLoading ? (
+                <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Spinner />
+                  Loading analytics...
+                </div>
+              ) : analytics?.fieldBreakdown.length ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {analytics.fieldBreakdown.map((field) => (
+                    <div key={field.fieldId} className="rounded-lg border p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{field.label}</p>
+                          <p className="text-sm text-muted-foreground">{formatFieldType(field.type)}</p>
+                        </div>
+                        <Badge variant="secondary">{field.responseCount} filled</Badge>
+                      </div>
+                      {field.options?.length ? (
+                        <div className="mt-3 space-y-2 text-sm">
+                          {field.options.map((option) => (
+                            <div key={option.value} className="flex justify-between gap-3">
+                              <span className="text-muted-foreground">{option.label}</span>
+                              <span className="font-medium">{option.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : field.averageRating !== undefined ? (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          Average rating: {field.averageRating.toFixed(1)}
+                        </p>
+                      ) : (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          {field.responseCount} responses include an answer.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex min-h-32 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center">
+                  <p className="font-medium">No response data yet</p>
+                  <p className="text-sm text-muted-foreground">Analytics will update as responses arrive.</p>
                 </div>
               )}
             </CardContent>

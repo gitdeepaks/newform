@@ -3,6 +3,7 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
@@ -14,8 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useFields, useSubmissions } from "@/hooks/api/form";
-import { use } from "react";
+import { useExportResponsesCsv, useResponses } from "@/hooks/api/form";
+import { use, useState } from "react";
+import { toast } from "sonner";
 
 type SubmissionsPageProps = {
   params: Promise<{
@@ -23,22 +25,70 @@ type SubmissionsPageProps = {
   }>;
 };
 
-type Field = NonNullable<ReturnType<typeof useFields>["fields"]>[number];
+type Field = NonNullable<ReturnType<typeof useResponses>["responsesData"]>["fields"][number];
+
+const stringArraySchema = {
+  parse(value: string) {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === "string") ? parsed : [];
+  },
+};
+
+function parseStringArray(value: string) {
+  try {
+    return stringArraySchema.parse(value);
+  } catch {
+    return [];
+  }
+}
+
+function getOptionLabel(field: Field, value: string) {
+  return field.options?.find((option) => option.value === value)?.label ?? value;
+}
 
 function formatValue(field: Field, value: string | undefined) {
-  if (value === undefined || value === "") return "—";
-  if (field.type === "CHECKBOX") return value === "true" ? "Yes" : value;
+  if (value === undefined || value === "") return "-";
+  if (field.type === "SINGLE_SELECT") return getOptionLabel(field, value);
+  if (field.type === "MULTI_SELECT") {
+    const values = parseStringArray(value).map((item) => getOptionLabel(field, item));
+    return values.length > 0 ? values.join(", ") : "-";
+  }
+  if (field.type === "CHECKBOX") {
+    if ((field.options?.length ?? 0) > 0) {
+      const values = parseStringArray(value).map((item) => getOptionLabel(field, item));
+      return values.length > 0 ? values.join(", ") : "-";
+    }
+    return value === "true" ? "Yes" : "No";
+  }
+  if (field.type === "RATING") return `${value} / ${field.validation?.ratingMax ?? 5}`;
   return value;
 }
 
 export default function SubmissionsPage({ params }: SubmissionsPageProps) {
   const { id } = use(params);
+  const [page, setPage] = useState(1);
 
-  const { fields, fieldsError, fieldsIsLoading } = useFields(id);
-  const { submissions, submissionsError, submissionsIsLoading } = useSubmissions(id);
+  const { responsesData, responsesError, responsesIsLoading, responsesIsFetching } = useResponses(id, page);
+  const { exportResponsesCsvAsync, exportResponsesCsvIsPending } = useExportResponsesCsv();
 
-  const isLoading = fieldsIsLoading || submissionsIsLoading;
-  const error = fieldsError ?? submissionsError;
+  const fields = responsesData?.fields;
+  const responses = responsesData?.responses;
+  const pagination = responsesData?.pagination;
+
+  const onExportCsv = async () => {
+    try {
+      const { csv, filename } = await exportResponsesCsvAsync({ formId: id });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to export CSV");
+    }
+  };
 
   return (
     <SidebarProvider
@@ -54,7 +104,7 @@ export default function SubmissionsPage({ params }: SubmissionsPageProps) {
         <SiteHeader />
         <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
           <div>
-            <h1 className="text-2xl font-semibold">Submissions</h1>
+            <h1 className="text-2xl font-semibold">Responses</h1>
             <p className="text-sm text-muted-foreground">
               Responses people have submitted to this form.
             </p>
@@ -62,20 +112,28 @@ export default function SubmissionsPage({ params }: SubmissionsPageProps) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Responses</CardTitle>
-              <CardDescription>
-                {submissions ? `${submissions.length} total` : "Each row is a single submission."}
-              </CardDescription>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle>Responses</CardTitle>
+                  <CardDescription>
+                    {pagination ? `${pagination.total} total` : "Each row is a single response."}
+                  </CardDescription>
+                </div>
+                <Button onClick={onExportCsv} disabled={exportResponsesCsvIsPending}>
+                  {exportResponsesCsvIsPending ? <Spinner /> : null}
+                  Export CSV
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {responsesIsLoading ? (
                 <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
                   <Spinner />
-                  Loading submissions...
+                  Loading responses...
                 </div>
-              ) : error ? (
+              ) : responsesError ? (
                 <Alert variant="destructive">
-                  <AlertDescription>{error.message}</AlertDescription>
+                  <AlertDescription>{responsesError.message}</AlertDescription>
                 </Alert>
               ) : fields && fields.length === 0 ? (
                 <div className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center">
@@ -84,44 +142,67 @@ export default function SubmissionsPage({ params }: SubmissionsPageProps) {
                     Add fields to this form before collecting responses.
                   </p>
                 </div>
-              ) : submissions && submissions.length > 0 && fields ? (
-                <div className="overflow-x-auto">
-                  <Table>
+              ) : responses && responses.length > 0 && fields && pagination ? (
+                <div className="flex flex-col gap-4">
+                  <div className="overflow-x-auto">
+                    <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Submitted At</TableHead>
+                        <TableHead>Respondent Email</TableHead>
                         {fields.map((field) => (
                           <TableHead key={field.id}>{field.label}</TableHead>
                         ))}
-                        <TableHead className="text-right">Submitted</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {submissions.map((submission) => {
+                      {responses.map((response) => {
                         const valueByFieldId = new Map(
-                          (submission.values ?? []).map((entry) => [entry.formFieldId, entry.value]),
+                          (response.values ?? []).map((entry) => [entry.formFieldId, entry.value]),
                         );
 
                         return (
-                          <TableRow key={submission.id}>
+                          <TableRow key={response.id}>
+                            <TableCell className="text-muted-foreground">
+                              {response.submittedAt ? new Date(response.submittedAt).toLocaleString() : "-"}
+                            </TableCell>
+                            <TableCell>{response.respondentEmail ?? "-"}</TableCell>
                             {fields.map((field) => (
                               <TableCell key={field.id}>
                                 {formatValue(field, valueByFieldId.get(field.id))}
                               </TableCell>
                             ))}
-                            <TableCell className="text-right text-muted-foreground">
-                              {submission.createdAt
-                                ? new Date(submission.createdAt).toLocaleString()
-                                : "—"}
-                            </TableCell>
                           </TableRow>
                         );
                       })}
                     </TableBody>
-                  </Table>
+                    </Table>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page <= 1 || responsesIsFetching}
+                      onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span>
+                      Page {pagination.page} of {pagination.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page >= pagination.totalPages || responsesIsFetching}
+                      onClick={() => setPage((currentPage) => currentPage + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center">
-                  <p className="font-medium">No submissions yet</p>
+                  <p className="font-medium">No responses yet</p>
                   <p className="text-sm text-muted-foreground">
                     Responses will appear here once people start submitting this form.
                   </p>

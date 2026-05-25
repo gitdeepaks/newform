@@ -385,7 +385,7 @@ Verification completed:
 - [x] `pnpm check-types` passed.
 - [x] `pnpm build` passed.
 
-## Priority 4: Responses And Analytics
+## Priority 4: Responses And Analytics - Completed
 
 Target: hours 24-32.
 
@@ -400,54 +400,71 @@ Use:
 
 Add:
 
-- `listResponses({ formId, userId, page, pageSize })`.
-- `getResponse({ responseId, userId })` optional.
-- `getFormAnalytics({ formId, userId })`.
-- `exportResponsesCsv({ formId, userId })` optional if time remains.
+- [x] `listResponses({ formId, userId, page, pageSize })`.
+- [ ] `getResponse({ responseId, userId })` optional.
+- [x] `getFormAnalytics({ formId, userId })`.
+- [x] `exportResponsesCsv({ formId, userId })`.
 
 Analytics should calculate:
 
-- total views.
-- total submissions.
-- completion rate.
-- submissions by day.
-- select/rating breakdown.
+- [x] total views.
+- [x] total submissions.
+- [x] completion rate.
+- [x] submissions by day.
+- [x] select/rating breakdown.
 
 ### tRPC Procedure
 
 Add protected procedures:
 
-- `listResponses`.
-- `getFormAnalytics`.
-- `exportResponsesCsv` optional.
+- [x] `listResponses`.
+- [x] `getFormAnalytics`.
+- [x] `exportResponsesCsv`.
 
 ### Hook
 
 Add:
 
-- `useResponses(formId)`.
-- `useFormAnalytics(formId)`.
-- `useExportResponsesCsv(formId)` optional.
+- [x] `useResponses(formId)`.
+- [x] `useFormAnalytics(formId)`.
+- [x] `useExportResponsesCsv(formId)`.
 
 ### UI
 
 Improve submissions page:
 
-- Rename visible copy to `Responses`.
-- Add pagination if quick.
-- Add response detail drawer/card if quick.
+- [x] Rename visible copy to `Responses`.
+- [x] Add pagination.
+- [ ] Add response detail drawer/card if time allows.
 
 Add analytics UI:
 
-- Cards on form builder/detail page.
-- Chart using existing `recharts` components.
-- Empty state for forms with no data.
+- [x] Cards on form builder/detail page.
+- [ ] Chart using existing `recharts` components if time allows.
+- [x] Empty state for forms with no data.
 
 Acceptance:
 
-- Creator can see responses.
-- Creator can see analytics.
-- Creator cannot see another creator's responses.
+- [x] Creator can see responses.
+- [x] Creator can see analytics.
+- [x] Creator cannot see another creator's responses.
+- [x] Creator can export responses as CSV.
+
+Completed files:
+
+- `packages/services/form-submission/model.ts`
+- `packages/services/form-submission/index.ts`
+- `packages/trpc/server/routes/form/model.ts`
+- `packages/trpc/server/routes/form/route.ts`
+- `apps/web/hooks/api/form/index.ts`
+- `apps/web/app/dashboard/forms/[id]/page.tsx`
+- `apps/web/app/dashboard/forms/[id]/submissions/page.tsx`
+- `apps/web/app/f/[slug]/page.tsx`
+
+Verification completed:
+
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
 
 ## Priority 5: Themes, Explore, Seed Data
 

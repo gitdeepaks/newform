@@ -9,14 +9,21 @@ import {
   type FormFieldOption,
   type FormFieldValidation,
   type FormSubmissionMetadata,
+  type FormSubmissionValueRow,
 } from "@repo/database/schema";
 import { z } from "zod";
 import {
   createSubmissionInputSchema,
+  exportResponsesCsvInputSchema,
+  getFormAnalyticsInputSchema,
   getSubmissionsByFormIdInputSchema,
+  listResponsesInputSchema,
   submitPublicResponseInputSchema,
   type CreateSubmissionInputSchemaType,
+  type ExportResponsesCsvInputSchemaType,
+  type GetFormAnalyticsInputSchemaType,
   type GetSubmissionsByFormIdInputSchemaType,
+  type ListResponsesInputSchemaType,
   type SubmitPublicResponseInputSchemaType,
 } from "./model";
 
@@ -29,6 +36,14 @@ type PublicField = {
   id: string;
   type: string;
   isRequired: boolean | null;
+  options: FormFieldOption[] | null;
+  validation: FormFieldValidation | null;
+};
+
+type ResponseField = {
+  id: string;
+  label: string;
+  type: string;
   options: FormFieldOption[] | null;
   validation: FormFieldValidation | null;
 };
@@ -54,6 +69,45 @@ function parseJsonArray(value: string) {
   } catch {
     throw new Error("Invalid multi-select value");
   }
+}
+
+function parseStringArray(value: string) {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return stringArraySchema.parse(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function getAnswerValue(values: FormSubmissionValueRow | null | undefined, fieldId: string) {
+  return values?.find((value) => value.formFieldId === fieldId)?.value;
+}
+
+function getOptionLabel(field: ResponseField, value: string) {
+  return field.options?.find((option) => option.value === value)?.label ?? value;
+}
+
+function formatResponseValueForCsv(field: ResponseField, value: string | undefined) {
+  if (!value) return "";
+
+  if (field.type === "SINGLE_SELECT") return getOptionLabel(field, value);
+  if (field.type === "MULTI_SELECT") {
+    return parseStringArray(value).map((item) => getOptionLabel(field, item)).join(", ");
+  }
+  if (field.type === "CHECKBOX") {
+    if ((field.options?.length ?? 0) > 0) {
+      return parseStringArray(value).map((item) => getOptionLabel(field, item)).join(", ");
+    }
+    return value === "true" ? "Yes" : "No";
+  }
+
+  return value;
+}
+
+function escapeCsvValue(value: string) {
+  if (!/[",\n]/.test(value)) return value;
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 function validateAnswer(field: PublicField, value: string) {
@@ -126,6 +180,32 @@ function validateAnswer(field: PublicField, value: string) {
 }
 
 class FormSubmissionService {
+  private async verifyOwner(formId: string, userId: string) {
+    const formRows = await db
+      .select({ id: formsTable.id, title: formsTable.title })
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), eq(formsTable.createdBy, userId)))
+      .limit(1);
+
+    const form = formRows[0];
+    if (!form) throw new Error(`Form With ${formId} Not Found`);
+    return form;
+  }
+
+  private async getResponseFields(formId: string) {
+    return db
+      .select({
+        id: formFieldsTable.id,
+        label: formFieldsTable.label,
+        type: formFieldsTable.type,
+        options: formFieldsTable.options,
+        validation: formFieldsTable.validation,
+      })
+      .from(formFieldsTable)
+      .where(eq(formFieldsTable.formId, formId))
+      .orderBy(formFieldsTable.index);
+  }
+
   public async createSubmission(input: CreateSubmissionInputSchemaType) {
     const { formId, values } = await createSubmissionInputSchema.parseAsync(input);
 
@@ -250,16 +330,7 @@ class FormSubmissionService {
 
   public async getSubmissionsByFormId(input: GetSubmissionsByFormIdInputSchemaType) {
     const { formId, userId } = await getSubmissionsByFormIdInputSchema.parseAsync(input);
-
-    const formRows = await db
-      .select({ id: formsTable.id })
-      .from(formsTable)
-      .where(and(eq(formsTable.id, formId), eq(formsTable.createdBy, userId)))
-      .limit(1);
-
-    if (formRows.length === 0) {
-      throw new Error(`Form With ${formId} Not Found`);
-    }
+    await this.verifyOwner(formId, userId);
 
     return db
       .select({
@@ -272,6 +343,150 @@ class FormSubmissionService {
       .from(formSubmissionsTable)
       .where(eq(formSubmissionsTable.formId, formId))
       .orderBy(formSubmissionsTable.createdAt);
+  }
+
+  public async listResponses(input: ListResponsesInputSchemaType) {
+    const { formId, userId, page, pageSize } = await listResponsesInputSchema.parseAsync(input);
+    await this.verifyOwner(formId, userId);
+
+    const fields = await this.getResponseFields(formId);
+    const offset = (page - 1) * pageSize;
+    const [responses, totalRows] = await Promise.all([
+      db
+        .select({
+          id: formSubmissionsTable.id,
+          respondentEmail: formSubmissionsTable.respondentEmail,
+          values: formSubmissionsTable.values,
+          metadata: formSubmissionsTable.metadata,
+          submittedAt: formSubmissionsTable.submittedAt,
+          createdAt: formSubmissionsTable.createdAt,
+        })
+        .from(formSubmissionsTable)
+        .where(eq(formSubmissionsTable.formId, formId))
+        .orderBy(formSubmissionsTable.submittedAt)
+        .limit(pageSize)
+        .offset(offset),
+      db.select({ value: count() }).from(formSubmissionsTable).where(eq(formSubmissionsTable.formId, formId)),
+    ]);
+    const total = totalRows[0]?.value ?? 0;
+
+    return {
+      fields,
+      responses,
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    };
+  }
+
+  public async getFormAnalytics(input: GetFormAnalyticsInputSchemaType) {
+    const { formId, userId } = await getFormAnalyticsInputSchema.parseAsync(input);
+    await this.verifyOwner(formId, userId);
+
+    const [fields, submissions, events] = await Promise.all([
+      this.getResponseFields(formId),
+      db
+        .select({ values: formSubmissionsTable.values, submittedAt: formSubmissionsTable.submittedAt })
+        .from(formSubmissionsTable)
+        .where(eq(formSubmissionsTable.formId, formId)),
+      db
+        .select({ type: responseEventsTable.type })
+        .from(responseEventsTable)
+        .where(eq(responseEventsTable.formId, formId)),
+    ]);
+
+    const totalResponses = submissions.length;
+    const totalSubmissions = events.filter((event) => event.type === "submit").length;
+    const totalViews = events.filter((event) => event.type === "view").length;
+    const submissionsByDayMap = new Map<string, number>();
+
+    for (const submission of submissions) {
+      const date = (submission.submittedAt ?? new Date()).toISOString().slice(0, 10);
+      submissionsByDayMap.set(date, (submissionsByDayMap.get(date) ?? 0) + 1);
+    }
+
+    const fieldBreakdown = fields.map((field) => {
+      const optionCounts = new Map<string, number>();
+      let responseCount = 0;
+      let ratingTotal = 0;
+      let ratingCount = 0;
+
+      for (const submission of submissions) {
+        const answer = getAnswerValue(submission.values, field.id);
+        if (!answer) continue;
+
+        if (field.type === "SINGLE_SELECT") {
+          responseCount += 1;
+          optionCounts.set(answer, (optionCounts.get(answer) ?? 0) + 1);
+        } else if (field.type === "MULTI_SELECT" || (field.type === "CHECKBOX" && (field.options?.length ?? 0) > 0)) {
+          const values = parseStringArray(answer);
+          if (values.length > 0) responseCount += 1;
+          for (const value of values) optionCounts.set(value, (optionCounts.get(value) ?? 0) + 1);
+        } else if (field.type === "CHECKBOX") {
+          responseCount += 1;
+          optionCounts.set(answer, (optionCounts.get(answer) ?? 0) + 1);
+        } else if (field.type === "RATING") {
+          const rating = Number(answer);
+          if (Number.isFinite(rating)) {
+            responseCount += 1;
+            ratingTotal += rating;
+            ratingCount += 1;
+          }
+        } else if (answer.trim()) {
+          responseCount += 1;
+        }
+      }
+
+      return {
+        fieldId: field.id,
+        label: field.label,
+        type: field.type,
+        responseCount,
+        options: optionCounts.size
+          ? Array.from(optionCounts.entries()).map(([value, valueCount]) => ({
+              label: field.type === "CHECKBOX" && (field.options?.length ?? 0) === 0 ? (value === "true" ? "Yes" : "No") : getOptionLabel(field, value),
+              value,
+              count: valueCount,
+            }))
+          : undefined,
+        averageRating: ratingCount > 0 ? ratingTotal / ratingCount : undefined,
+      };
+    });
+
+    return {
+      totalResponses,
+      totalSubmissions,
+      totalViews,
+      completionRate: totalViews > 0 ? (totalSubmissions / totalViews) * 100 : totalResponses > 0 ? 100 : 0,
+      submissionsByDay: Array.from(submissionsByDayMap.entries()).map(([date, valueCount]) => ({ date, count: valueCount })),
+      fieldBreakdown,
+    };
+  }
+
+  public async exportResponsesCsv(input: ExportResponsesCsvInputSchemaType) {
+    const { formId, userId } = await exportResponsesCsvInputSchema.parseAsync(input);
+    const form = await this.verifyOwner(formId, userId);
+    const [fields, responses] = await Promise.all([
+      this.getResponseFields(formId),
+      db
+        .select({
+          respondentEmail: formSubmissionsTable.respondentEmail,
+          values: formSubmissionsTable.values,
+          submittedAt: formSubmissionsTable.submittedAt,
+        })
+        .from(formSubmissionsTable)
+        .where(eq(formSubmissionsTable.formId, formId))
+        .orderBy(formSubmissionsTable.submittedAt),
+    ]);
+
+    const header = ["Submitted At", "Respondent Email", ...fields.map((field) => field.label)];
+    const rows = responses.map((response) => [
+      response.submittedAt?.toISOString() ?? "",
+      response.respondentEmail ?? "",
+      ...fields.map((field) => formatResponseValueForCsv(field, getAnswerValue(response.values, field.id))),
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(escapeCsvValue).join(",")).join("\n");
+    const filename = `${form.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "form"}-responses.csv`;
+
+    return { filename, csv };
   }
 
   private async createEmailEvents({

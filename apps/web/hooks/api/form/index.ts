@@ -272,6 +272,8 @@ export const useSubmitPublicResponse = () => {
     onSuccess: async () => {
       await utils.form.getPublicFormBySlug.invalidate();
       await utils.form.getSubmissions.invalidate();
+      await utils.form.listResponses.invalidate();
+      await utils.form.getFormAnalytics.invalidate();
     },
   });
 
@@ -306,6 +308,38 @@ export const useSubmissions = (formId: string) => {
     submissionsIsFetched,
     submissionsIsError,
     submissionsStatus,
+  };
+};
+
+export const useResponses = (formId: string, page = 1) => {
+  const query = trpc.form.listResponses.useQuery({ formId, page, pageSize: 20 });
+
+  return {
+    responsesData: query.data,
+    responsesError: query.error,
+    responsesIsLoading: query.isLoading,
+    responsesIsFetching: query.isFetching,
+  };
+};
+
+export const useFormAnalytics = (formId: string) => {
+  const query = trpc.form.getFormAnalytics.useQuery({ formId });
+
+  return {
+    analytics: query.data,
+    analyticsError: query.error,
+    analyticsIsLoading: query.isLoading,
+    analyticsIsFetching: query.isFetching,
+  };
+};
+
+export const useExportResponsesCsv = () => {
+  const mutation = trpc.form.exportResponsesCsv.useMutation();
+
+  return {
+    exportResponsesCsvAsync: mutation.mutateAsync,
+    exportResponsesCsvIsPending: mutation.isPending,
+    exportResponsesCsvError: mutation.error,
   };
 };
 
