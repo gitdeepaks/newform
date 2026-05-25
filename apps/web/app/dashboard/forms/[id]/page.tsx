@@ -41,8 +41,10 @@ import {
   useDeleteField,
   useFields,
   useFormAnalytics,
+  useAssignTheme,
   useOwnerForm,
   usePublishForm,
+  useThemes,
   useUnpublishForm,
   useUpdateField,
   useUpdateForm,
@@ -233,6 +235,8 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
   const { updateVisibilityAsync, updateVisibilityIsPending } = useUpdateVisibility();
   const { publishFormAsync, publishFormIsPending } = usePublishForm();
   const { unpublishFormAsync, unpublishFormIsPending } = useUnpublishForm();
+  const { themes, themesIsLoading } = useThemes();
+  const { assignThemeAsync, assignThemeIsPending } = useAssignTheme();
 
   const createForm = useForm<FieldValues>({
     resolver: zodResolver(fieldSchema),
@@ -390,6 +394,16 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
     }
   }
 
+  async function onAssignTheme(themeId: string) {
+    try {
+      await assignThemeAsync({ formId: id, themeId });
+      toast.success("Theme saved");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save theme";
+      toast.error(message);
+    }
+  }
+
   async function copyShareLink() {
     if (!ownerForm?.slug) return;
     await navigator.clipboard.writeText(`${window.location.origin}/f/${ownerForm.slug}`);
@@ -401,7 +415,8 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
     updateSlugIsPending ||
     updateVisibilityIsPending ||
     publishFormIsPending ||
-    unpublishFormIsPending;
+    unpublishFormIsPending ||
+    assignThemeIsPending;
 
   return (
     <SidebarProvider
@@ -580,6 +595,49 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
                         </FormItem>
                       )}
                     />
+                    <div className="rounded-lg border p-4 lg:col-span-2">
+                      <div className="flex flex-col gap-1">
+                        <h3 className="font-medium">Theme</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Current: {ownerForm.theme?.name ?? "No theme selected"}
+                        </p>
+                      </div>
+                      {themesIsLoading ? (
+                        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                          <Spinner />
+                          Loading themes...
+                        </div>
+                      ) : (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {(themes ?? []).map((theme) => {
+                            const selected = ownerForm.theme?.id === theme.id;
+                            return (
+                              <button
+                                key={theme.id}
+                                type="button"
+                                disabled={assignThemeIsPending}
+                                onClick={() => onAssignTheme(theme.id)}
+                                className={`rounded-lg border p-3 text-left transition hover:border-primary disabled:opacity-60 ${
+                                  selected ? "border-primary ring-2 ring-primary/20" : ""
+                                }`}
+                              >
+                                <div className="font-medium">{theme.name}</div>
+                                <div className="text-xs text-muted-foreground">{theme.category}</div>
+                                <div className="mt-3 flex gap-1">
+                                  {[theme.tokens.background, theme.tokens.card, theme.tokens.accent].map((color) => (
+                                    <span
+                                      key={color}
+                                      className="h-5 w-5 rounded-full border"
+                                      style={{ backgroundColor: color }}
+                                    />
+                                  ))}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex flex-col gap-2 lg:col-span-2 sm:flex-row sm:justify-between">
                       <div className="flex gap-2">
                         <Button type="submit" disabled={lifecycleIsPending}>

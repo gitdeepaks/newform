@@ -65,6 +65,12 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
   const [answers, setAnswers] = useState<PublicAnswers>({});
   const [honeypot, setHoneypot] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const theme = form?.theme?.tokens;
+  const cardStyle = theme
+    ? { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }
+    : undefined;
+  const mutedStyle = theme ? { color: theme.mutedText } : undefined;
+  const accentStyle = theme ? { backgroundColor: theme.accent, color: theme.accentText } : undefined;
 
   function setAnswer(fieldId: string, value: PublicAnswer) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
@@ -110,7 +116,10 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
   }
 
   return (
-    <main className="flex min-h-svh justify-center bg-muted/30 px-4 py-10">
+    <main
+      className="flex min-h-svh justify-center bg-muted/30 px-4 py-10"
+      style={theme ? { backgroundColor: theme.background, color: theme.text } : undefined}
+    >
       <div className="w-full max-w-xl">
         {formIsLoading ? (
           <div className="flex min-h-60 items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -122,23 +131,23 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
             <AlertDescription>This form is unavailable or has not been published.</AlertDescription>
           </Alert>
         ) : isSubmitted ? (
-          <Card>
+          <Card style={cardStyle}>
             <CardHeader>
               <CardTitle className="text-2xl">{form?.thankYouTitle ?? "Thanks for your response"}</CardTitle>
-              <CardDescription>
+              <CardDescription style={mutedStyle}>
                 {form?.thankYouMessage ?? "Your submission has been recorded."}
               </CardDescription>
             </CardHeader>
           </Card>
         ) : form ? (
-          <Card>
+          <Card style={cardStyle}>
             <CardHeader>
               <CardTitle className="text-2xl">{form.title}</CardTitle>
-              {form.description ? <CardDescription>{form.description}</CardDescription> : null}
+              {form.description ? <CardDescription style={mutedStyle}>{form.description}</CardDescription> : null}
             </CardHeader>
             <CardContent>
               {form.fields.length === 0 ? (
-                <p className="text-sm text-muted-foreground">This form has no fields yet.</p>
+                        <p className="text-sm text-muted-foreground" style={mutedStyle}>This form has no fields yet.</p>
               ) : (
                 <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
                   {form.fields.map((field) => (
@@ -148,7 +157,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                         {field.isRequired ? <span className="text-destructive"> *</span> : null}
                       </Label>
                       {field.description ? (
-                        <p className="text-sm text-muted-foreground">{field.description}</p>
+                        <p className="text-sm text-muted-foreground" style={mutedStyle}>{field.description}</p>
                       ) : null}
 
                       {field.type === "LONG_TEXT" ? (
@@ -196,7 +205,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
 
                       {field.type === "CHECKBOX" && !field.options?.length ? (
                         <div className="flex flex-row items-center justify-between rounded-lg border p-3">
-                          <span className="text-sm text-muted-foreground">Confirm</span>
+                          <span className="text-sm text-muted-foreground" style={mutedStyle}>Confirm</span>
                           <Switch
                             id={field.id}
                             checked={answers[field.id] === true}
@@ -253,7 +262,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                     onChange={(event) => setHoneypot(event.target.value)}
                   />
 
-                  <Button type="submit" className="w-full" disabled={submitPublicResponseIsPending}>
+                  <Button type="submit" className="w-full" disabled={submitPublicResponseIsPending} style={accentStyle}>
                     {submitPublicResponseIsPending ? <Spinner /> : null}
                     Submit
                   </Button>

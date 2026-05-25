@@ -1,9 +1,11 @@
-import { formFieldService, formService, formSubmissionService } from "../../services";
+import { formFieldService, formService, formSubmissionService, themeService } from "../../services";
 import { protectedProcedure, publicProcedure, router } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 import {
   createFieldInputSchema,
   createFieldOutputSchema,
+  assignThemeInputSchema,
+  assignThemeOutputSchema,
   createFormInputSchema,
   createFormOutputSchema,
   deleteFieldInputSchema,
@@ -27,6 +29,8 @@ import {
   listPublicFormsOutputSchema,
   listFormsInputSchema,
   listFormsOutputSchema,
+  listThemesInputSchema,
+  listThemesOutputSchema,
   submitFormInputSchema,
   submitFormOutputSchema,
   submitPublicResponseInputSchema,
@@ -196,6 +200,35 @@ export const formRouter = router({
     .output(listPublicFormsOutputSchema)
     .query(async ({ input }) => {
       return formService.listPublicForms(input);
+    }),
+
+  listThemes: publicProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: getPath("/listThemes"),
+        tags: TAGS,
+      },
+    })
+    .input(listThemesInputSchema)
+    .output(listThemesOutputSchema)
+    .query(async () => {
+      return themeService.listThemes();
+    }),
+
+  assignTheme: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: getPath("/assignTheme"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(assignThemeInputSchema)
+    .output(assignThemeOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return themeService.assignTheme({ ...input, userId: ctx.user.id });
     }),
 
   submitForm: publicProcedure

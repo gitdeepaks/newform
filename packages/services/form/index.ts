@@ -1,5 +1,6 @@
 import { and, count, db, eq, ne } from "@repo/database";
-import { formFieldsTable, formsTable } from "@repo/database/schema";
+import { formFieldsTable, formsTable, themesTable } from "@repo/database/schema";
+import type { ThemeTokens } from "@repo/database/schema";
 import { formFieldTypeSchema } from "../form-field/model";
 import {
   createFormInputSchema,
@@ -34,6 +35,23 @@ const createSlugFromTitle = (title: string) =>
     .replace(/^-+|-+$/g, "") || "form";
 
 class FormService {
+  private toTheme(
+    theme: {
+      id: string | null;
+      name: string | null;
+      category: string | null;
+      tokens: ThemeTokens | null;
+    } | null,
+  ) {
+    if (!theme || !theme.id || !theme.name || !theme.category || !theme.tokens) return null;
+    return {
+      id: theme.id,
+      name: theme.name,
+      category: theme.category,
+      tokens: theme.tokens,
+    };
+  }
+
   private async ensureUniqueSlug(slug: string, excludeFormId?: string) {
     let candidate = slug;
     let suffix = 2;
@@ -99,7 +117,7 @@ class FormService {
   public async listFromByUserId(input: ListFromByUserIdInputSchemaType) {
     const { userId } = await listFromByUserIdInputSchema.parseAsync(input);
 
-    return db
+    const rows = await db
       .select({
         id: formsTable.id,
         title: formsTable.title,
@@ -113,6 +131,8 @@ class FormService {
       })
       .from(formsTable)
       .where(eq(formsTable.createdBy, userId));
+
+    return rows;
   }
 
   public async getFormById(input: GetFormByIdInputSchemaType) {
@@ -133,6 +153,12 @@ class FormService {
           expiresAt: formsTable.expiresAt,
           responseLimit: formsTable.responseLimit,
         },
+        theme: {
+          id: themesTable.id,
+          name: themesTable.name,
+          category: themesTable.category,
+          tokens: themesTable.tokens,
+        },
         field: {
           id: formFieldsTable.id,
           label: formFieldsTable.label,
@@ -150,6 +176,7 @@ class FormService {
         },
       })
       .from(formsTable)
+      .leftJoin(themesTable, eq(themesTable.id, formsTable.themeId))
       .leftJoin(formFieldsTable, eq(formFieldsTable.formId, formsTable.id))
       .where(eq(formsTable.id, formId))
       .orderBy(formFieldsTable.index);
@@ -167,6 +194,7 @@ class FormService {
 
     return {
       ...form,
+      theme: this.toTheme(firstRow.theme),
       fields,
     };
   }
@@ -285,16 +313,25 @@ class FormService {
   public async listPublicForms(input: ListPublicFormsInputSchemaType) {
     await listPublicFormsInputSchema.parseAsync(input);
 
-    return db
+    const rows = await db
       .select({
         id: formsTable.id,
         title: formsTable.title,
         description: formsTable.description,
         slug: formsTable.slug,
         publishedAt: formsTable.publishedAt,
+        theme: {
+          id: themesTable.id,
+          name: themesTable.name,
+          category: themesTable.category,
+          tokens: themesTable.tokens,
+        },
       })
       .from(formsTable)
+      .leftJoin(themesTable, eq(themesTable.id, formsTable.themeId))
       .where(and(eq(formsTable.status, "published"), eq(formsTable.visibility, "public")));
+
+    return rows.map(({ theme, ...form }) => ({ ...form, theme: this.toTheme(theme) }));
   }
 }
 

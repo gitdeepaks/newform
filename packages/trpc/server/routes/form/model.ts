@@ -232,6 +232,38 @@ export const formFieldSchema = z.object({
   updatedAt: z.date().nullable().describe("The date the form field was last updated"),
 });
 
+export const themeTokensOutputSchema = z.object({
+  background: z.string(),
+  card: z.string(),
+  text: z.string(),
+  mutedText: z.string(),
+  accent: z.string(),
+  accentText: z.string(),
+  border: z.string(),
+});
+
+export const themeOutputSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: z.string(),
+  tokens: themeTokensOutputSchema,
+});
+
+export const listThemesInputSchema = z.undefined();
+export const listThemesOutputSchema = z.array(
+  themeOutputSchema.extend({ isPublic: z.boolean().optional() }),
+);
+
+export const assignThemeInputSchema = z.object({
+  formId: z.string().describe("The id of the form"),
+  themeId: z.string().describe("The id of the theme"),
+});
+
+export const assignThemeOutputSchema = z.object({
+  id: z.string(),
+  themeId: z.string().nullable(),
+});
+
 export const getFormInputSchema = z.object({
   formId: z.string().describe("The id of the form"),
 });
@@ -252,6 +284,7 @@ export const getFormOutputSchema = z.object({
   publishedAt: z.date().nullable().describe("The published date"),
   expiresAt: z.date().nullable().describe("The expiration date"),
   responseLimit: z.number().nullable().describe("The response limit"),
+  theme: themeOutputSchema.nullable().optional(),
   fields: z.array(formFieldSchema).describe("The fields belonging to the form"),
 });
 
@@ -264,6 +297,7 @@ export const listPublicFormsOutputSchema = z.array(
     description: z.string().nullable().describe("The description of the form"),
     slug: z.string().describe("The form slug"),
     publishedAt: z.date().nullable().describe("The published date"),
+    theme: themeOutputSchema.nullable().optional(),
   }),
 );
 

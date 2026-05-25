@@ -466,7 +466,7 @@ Verification completed:
 - [x] `pnpm check-types` passed.
 - [x] `pnpm build` passed.
 
-## Priority 5: Themes, Explore, Seed Data
+## Priority 5: Themes, Templates, Seed Data - Completed
 
 Target: hours 32-40.
 
@@ -536,6 +536,34 @@ Acceptance:
 - Public forms appear on explore/templates.
 - Unlisted forms do not appear publicly.
 - Themes are visually visible on public form pages.
+
+Completed files:
+
+- `packages/database/models/theme.ts`
+- `packages/database/schema.ts`
+- `packages/database/index.ts`
+- `packages/database/drizzle/20260525182447_cooing_korg/migration.sql`
+- `packages/database/seed.ts`
+- `packages/database/package.json`
+- `package.json`
+- `packages/services/theme/model.ts`
+- `packages/services/theme/index.ts`
+- `packages/services/form/index.ts`
+- `packages/trpc/server/services/index.ts`
+- `packages/trpc/server/routes/form/model.ts`
+- `packages/trpc/server/routes/form/route.ts`
+- `apps/web/hooks/api/form/index.ts`
+- `apps/web/app/dashboard/forms/[id]/page.tsx`
+- `apps/web/app/f/[slug]/page.tsx`
+- `apps/web/app/templates/page.tsx`
+
+Verification results:
+
+- `pnpm db:generate` passed and generated the `themes` migration.
+- `pnpm db:migrate` passed and applied migrations.
+- `pnpm db:seed` passed twice, verifying idempotent reseeding of known demo data.
+- `pnpm check-types` passed.
+- `pnpm build` passed.
 
 ## Priority 6: Landing, Pricing, Docs, README, Deployment
 

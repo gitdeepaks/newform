@@ -141,6 +141,41 @@ export const usePublicForms = () => {
   };
 };
 
+export const useThemes = () => {
+  const {
+    data: themes,
+    error: themesError,
+    isLoading: themesIsLoading,
+    isFetching: themesIsFetching,
+  } = trpc.form.listThemes.useQuery();
+
+  return {
+    themes,
+    themesError,
+    themesIsLoading,
+    themesIsFetching,
+  };
+};
+
+export const useAssignTheme = () => {
+  const utils = trpc.useUtils();
+  const mutation = trpc.form.assignTheme.useMutation({
+    onSuccess: async () => {
+      await utils.form.getFormForOwner.invalidate();
+      await utils.form.getPublicFormBySlug.invalidate();
+      await utils.form.listPublicForms.invalidate();
+      await utils.form.listForms.invalidate();
+    },
+  });
+
+  return {
+    assignThemeAsync: mutation.mutateAsync,
+    assignTheme: mutation.mutate,
+    assignThemeError: mutation.error,
+    assignThemeIsPending: mutation.isPending,
+  };
+};
+
 export const useUpdateForm = () => {
   const utils = trpc.useUtils();
   const mutation = trpc.form.updateForm.useMutation({
