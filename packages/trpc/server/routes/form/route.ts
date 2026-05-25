@@ -23,6 +23,8 @@ import {
   listFormsOutputSchema,
   submitFormInputSchema,
   submitFormOutputSchema,
+  submitPublicResponseInputSchema,
+  submitPublicResponseOutputSchema,
   updateFieldInputSchema,
   updateFieldOutputSchema,
   updateFormInputSchema,
@@ -205,6 +207,23 @@ export const formRouter = router({
       return { id };
     }),
 
+  submitPublicResponse: publicProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: getPath("/submitPublicResponse"),
+        tags: TAGS,
+      },
+    })
+    .input(submitPublicResponseInputSchema)
+    .output(submitPublicResponseOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return formSubmissionService.submitPublicResponse({
+        ...input,
+        metadata: ctx.requestMeta,
+      });
+    }),
+
   getSubmissions: protectedProcedure
     .meta({
       openapi: {
@@ -216,8 +235,11 @@ export const formRouter = router({
     })
     .input(getSubmissionsInputSchema)
     .output(getSubmissionsOutputSchema)
-    .query(async ({ input }) => {
-      const submissions = await formSubmissionService.getSubmissionsByFormId(input);
+    .query(async ({ input, ctx }) => {
+      const submissions = await formSubmissionService.getSubmissionsByFormId({
+        ...input,
+        userId: ctx.user.id,
+      });
       return submissions;
     }),
 

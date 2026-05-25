@@ -80,6 +80,14 @@ export const submitFormOutputSchema = z.object({
   id: z.string().describe("The id of the created submission"),
 });
 
+export const submitPublicResponseInputSchema = z.object({
+  slug: slugSchema.describe("The public form slug"),
+  values: z.array(submissionValueSchema).describe("The submitted answers for the form fields"),
+  honeypot: z.string().optional().describe("Hidden spam protection field"),
+});
+
+export const submitPublicResponseOutputSchema = submitFormOutputSchema;
+
 export const getSubmissionsInputSchema = z.object({
   formId: z.string().describe("The id of the form whose submissions to fetch"),
 });
