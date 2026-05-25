@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { usePublicForm, useSubmitForm } from "@/hooks/api/form";
@@ -18,13 +20,41 @@ type PublicSlugFormPageProps = {
 };
 
 type Field = NonNullable<ReturnType<typeof usePublicForm>["form"]>["fields"][number];
+type PublicAnswer = string | string[] | boolean;
+type PublicAnswers = Record<string, PublicAnswer>;
 
 const inputTypeMap: Record<Field["type"], string> = {
-  TEXT: "text",
+  SHORT_TEXT: "text",
+  LONG_TEXT: "text",
   NUMBER: "number",
   EMAIL: "email",
-  PASSWORD: "password",
-  YES_NO: "checkbox",
+  SINGLE_SELECT: "text",
+  MULTI_SELECT: "text",
+  CHECKBOX: "checkbox",
+  RATING: "number",
+  DATE: "date",
+};
+
+const getStringAnswer = (answers: PublicAnswers, fieldId: string) => {
+  const value = answers[fieldId];
+  return typeof value === "string" ? value : "";
+};
+
+const getArrayAnswer = (answers: PublicAnswers, fieldId: string) => {
+  const value = answers[fieldId];
+  return Array.isArray(value) ? value : [];
+};
+
+const serializeAnswer = (answer: PublicAnswer) => {
+  if (Array.isArray(answer)) return JSON.stringify(answer);
+  return `${answer}`;
+};
+
+const isMissingRequiredAnswer = (field: Field, answer: PublicAnswer | undefined) => {
+  if (!field.isRequired) return false;
+  if (Array.isArray(answer)) return answer.length === 0;
+  if (typeof answer === "boolean") return answer !== true;
+  return answer === undefined || answer.trim() === "";
 };
 
 export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) {
@@ -32,11 +62,19 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
   const { form, formError, formIsLoading } = usePublicForm(slug);
   const { submitFormAsync, submitFormIsPending } = useSubmitForm();
 
-  const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
+  const [answers, setAnswers] = useState<PublicAnswers>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  function setAnswer(fieldId: string, value: string | boolean) {
+  function setAnswer(fieldId: string, value: PublicAnswer) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
+  }
+
+  function toggleArrayAnswer(fieldId: string, value: string, checked: boolean) {
+    setAnswers((prev) => {
+      const current = getArrayAnswer(prev, fieldId);
+      const next = checked ? [...current, value] : current.filter((item) => item !== value);
+      return { ...prev, [fieldId]: next };
+    });
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -44,10 +82,7 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
     if (!form) return;
 
     const missing = form.fields.filter((field) => {
-      if (!field.isRequired) return false;
-      const value = answers[field.id];
-      if (field.type === "YES_NO") return value !== true;
-      return value === undefined || `${value}`.trim() === "";
+      return isMissingRequiredAnswer(field, answers[field.id]);
     });
 
     if (missing.length > 0) {
@@ -58,12 +93,11 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
     try {
       await submitFormAsync({
         formId: form.id,
-        values: form.fields
-          .filter((field) => answers[field.id] !== undefined)
-          .map((field) => ({
-            formFieldId: field.id,
-            value: `${answers[field.id]}`,
-          })),
+        values: form.fields.flatMap((field) => {
+          const answer = answers[field.id];
+          if (answer === undefined) return [];
+          return [{ formFieldId: field.id, value: serializeAnswer(answer) }];
+        }),
       });
       toast.success("Form submitted");
       setIsSubmitted(true);
@@ -105,49 +139,109 @@ export default function PublicSlugFormPage({ params }: PublicSlugFormPageProps) 
                 <p className="text-sm text-muted-foreground">This form has no fields yet.</p>
               ) : (
                 <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
-                  {form.fields.map((field) =>
-                    field.type === "YES_NO" ? (
-                      <div
-                        key={field.id}
-                        className="flex flex-row items-center justify-between rounded-lg border p-3"
-                      >
-                        <div>
-                          <Label htmlFor={field.id}>
-                            {field.label}
-                            {field.isRequired ? <span className="text-destructive"> *</span> : null}
-                          </Label>
-                          {field.description ? (
-                            <p className="text-sm text-muted-foreground">{field.description}</p>
-                          ) : null}
-                        </div>
-                        <Switch
+                  {form.fields.map((field) => (
+                    <div key={field.id} className="flex flex-col gap-2">
+                      <Label htmlFor={field.id}>
+                        {field.label}
+                        {field.isRequired ? <span className="text-destructive"> *</span> : null}
+                      </Label>
+                      {field.description ? (
+                        <p className="text-sm text-muted-foreground">{field.description}</p>
+                      ) : null}
+
+                      {field.type === "LONG_TEXT" ? (
+                        <Textarea
                           id={field.id}
-                          checked={answers[field.id] === true}
+                          placeholder={field.placeholder ?? undefined}
+                          required={field.isRequired ?? false}
                           disabled={submitFormIsPending}
-                          onCheckedChange={(checked) => setAnswer(field.id, checked)}
+                          value={getStringAnswer(answers, field.id)}
+                          onChange={(event) => setAnswer(field.id, event.target.value)}
                         />
-                      </div>
-                    ) : (
-                      <div key={field.id} className="flex flex-col gap-2">
-                        <Label htmlFor={field.id}>
-                          {field.label}
-                          {field.isRequired ? <span className="text-destructive"> *</span> : null}
-                        </Label>
-                        {field.description ? (
-                          <p className="text-sm text-muted-foreground">{field.description}</p>
-                        ) : null}
+                      ) : null}
+
+                      {field.type === "SINGLE_SELECT" ? (
+                        <NativeSelect
+                          id={field.id}
+                          value={getStringAnswer(answers, field.id)}
+                          disabled={submitFormIsPending}
+                          onChange={(event) => setAnswer(field.id, event.target.value)}
+                        >
+                          <NativeSelectOption value="">Select an option</NativeSelectOption>
+                          {(field.options ?? []).map((option) => (
+                            <NativeSelectOption key={option.id} value={option.value}>
+                              {option.label}
+                            </NativeSelectOption>
+                          ))}
+                        </NativeSelect>
+                      ) : null}
+
+                      {field.type === "MULTI_SELECT" || (field.type === "CHECKBOX" && field.options?.length) ? (
+                        <div className="flex flex-col gap-2 rounded-lg border p-3">
+                          {(field.options ?? []).map((option) => (
+                            <label key={option.id} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                disabled={submitFormIsPending}
+                                checked={getArrayAnswer(answers, field.id).includes(option.value)}
+                                onChange={(event) => toggleArrayAnswer(field.id, option.value, event.target.checked)}
+                              />
+                              {option.label}
+                            </label>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {field.type === "CHECKBOX" && !field.options?.length ? (
+                        <div className="flex flex-row items-center justify-between rounded-lg border p-3">
+                          <span className="text-sm text-muted-foreground">Confirm</span>
+                          <Switch
+                            id={field.id}
+                            checked={answers[field.id] === true}
+                            disabled={submitFormIsPending}
+                            onCheckedChange={(checked) => setAnswer(field.id, checked)}
+                          />
+                        </div>
+                      ) : null}
+
+                      {field.type === "RATING" ? (
+                        <div className="flex flex-wrap gap-2">
+                          {Array.from({ length: field.validation?.ratingMax ?? 5 }, (_, index) => {
+                            const value = `${index + 1}`;
+                            const selected = getStringAnswer(answers, field.id) === value;
+                            return (
+                              <Button
+                                key={value}
+                                type="button"
+                                variant={selected ? "default" : "outline"}
+                                size="sm"
+                                disabled={submitFormIsPending}
+                                onClick={() => setAnswer(field.id, value)}
+                              >
+                                {value}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
+                      {!["LONG_TEXT", "SINGLE_SELECT", "MULTI_SELECT", "CHECKBOX", "RATING"].includes(field.type) ? (
                         <Input
                           id={field.id}
                           type={inputTypeMap[field.type]}
                           placeholder={field.placeholder ?? undefined}
                           required={field.isRequired ?? false}
                           disabled={submitFormIsPending}
-                          value={(answers[field.id] as string) ?? ""}
+                          min={field.type === "DATE" ? field.validation?.dateMin : field.type === "NUMBER" ? field.validation?.min : undefined}
+                          max={field.type === "DATE" ? field.validation?.dateMax : field.type === "NUMBER" ? field.validation?.max : undefined}
+                          minLength={field.validation?.minLength}
+                          maxLength={field.validation?.maxLength}
+                          value={getStringAnswer(answers, field.id)}
                           onChange={(event) => setAnswer(field.id, event.target.value)}
                         />
-                      </div>
-                    ),
-                  )}
+                      ) : null}
+                    </div>
+                  ))}
 
                   <Button type="submit" className="w-full" disabled={submitFormIsPending}>
                     {submitFormIsPending ? <Spinner /> : null}

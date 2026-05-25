@@ -26,16 +26,16 @@ Implemented or partially implemented:
 - Form lifecycle is implemented: `draft`/`published`, visibility, slug, publish/unpublish, owner form lookup, public slug lookup, and public forms listing API.
 - Dashboard form list shows status, visibility, and copy share link.
 - Builder page has settings for title, description, slug, visibility, thank-you copy, publish/unpublish, copy link, and open public page.
+- Dynamic field types are implemented end-to-end: short text, long text, email, number, single select, multi select, checkbox, rating, and date.
+- Field options and field validation config are stored in DB, validated in service, exposed through tRPC, and editable in builder UI.
+- Public slug form renderer supports all current field types.
 
 Important gaps:
 
 - Public form submission still uses form id internally; final flow should move submission to slug-based `submitPublicResponse`.
 - `listPublicForms` API exists, but public explore/templates UI is still missing.
-- Field types are still limited to `TEXT`, `NUMBER`, `EMAIL`, `YES_NO`, `PASSWORD`.
-- Required types like long text, single select, multi select, checkbox, rating, and date are missing.
-- Field options and validation rules are missing.
 - Response validation is too loose: submissions accept any field id/value array.
-- Creator ownership checks are incomplete for field/submission reads.
+- Creator ownership checks are still incomplete for submission reads.
 - Analytics, themes, template/explore page, seeded data, email events, rate limiting, landing, pricing, README polish are missing.
 
 ## Sprint Strategy
@@ -192,7 +192,7 @@ Verification completed:
 - [x] `pnpm build` passed.
 - [ ] `pnpm lint` is blocked by pre-existing ESLint config/warnings unrelated to this lifecycle work.
 
-## Priority 2: Field Types, Options, Validations
+## Priority 2: Field Types, Options, Validations - Completed
 
 Target: hours 8-16.
 
@@ -200,18 +200,18 @@ Target: hours 8-16.
 
 Extend `form_fields`:
 
-- Field enum/string values:
-  - `SHORT_TEXT`
-  - `LONG_TEXT`
-  - `EMAIL`
-  - `NUMBER`
-  - `SINGLE_SELECT`
-  - `MULTI_SELECT`
-  - `CHECKBOX`
-  - `RATING`
-  - `DATE`
-- Add `options` JSON for select/multi-select/checkbox.
-- Add `validation` JSON for text min/max, number min/max, rating scale, date min/max.
+- [x] Field string values:
+  - [x] `SHORT_TEXT`
+  - [x] `LONG_TEXT`
+  - [x] `EMAIL`
+  - [x] `NUMBER`
+  - [x] `SINGLE_SELECT`
+  - [x] `MULTI_SELECT`
+  - [x] `CHECKBOX`
+  - [x] `RATING`
+  - [x] `DATE`
+- [x] Add `options` JSON for select/multi-select/checkbox.
+- [x] Add `validation` JSON for text min/max, number min/max, rating scale, date min/max.
 
 Migration note:
 
@@ -223,47 +223,68 @@ Migration note:
 
 Update `FormFieldService`:
 
-- Validate field options based on type.
-- Validate field validation config based on type.
-- Verify field form belongs to current user before create/update/delete.
-- Add `reorderFields({ formId, userId, orderedFieldIds })` only if time allows.
+- [x] Validate field options based on type.
+- [x] Validate field validation config based on type.
+- [x] Verify field form belongs to current user before create/update/delete/get fields.
+- [ ] Add `reorderFields({ formId, userId, orderedFieldIds })` only if time allows.
 
 ### tRPC Procedure
 
 Update field schemas and procedures:
 
-- `createField` protected accepts `options` and `validation`.
-- `updateField` protected accepts `options` and `validation`.
-- `deleteField` protected verifies owner.
-- `getFields` protected verifies owner.
+- [x] `createField` protected accepts `options` and `validation`.
+- [x] `updateField` protected accepts `options` and `validation`.
+- [x] `deleteField` protected verifies owner.
+- [x] `getFields` protected verifies owner.
 
 ### Hook
 
 Update existing hooks:
 
-- `useCreateField`.
-- `useUpdateField`.
-- `useDeleteField`.
-- `useFields`.
+- [x] `useCreateField`.
+- [x] `useUpdateField`.
+- [x] `useDeleteField`.
+- [x] `useFields`.
 
 ### UI
 
 Update field dialog:
 
-- Use new field type list.
-- Render options editor for `SINGLE_SELECT`, `MULTI_SELECT`, `CHECKBOX`.
-- Render validation inputs:
-  - short/long text min/max length.
-  - number min/max.
-  - rating max.
-  - date min/max.
-- Public form renderer supports all field types.
+- [x] Use new field type list.
+- [x] Render options editor for `SINGLE_SELECT`, `MULTI_SELECT`, `CHECKBOX`.
+- [x] Render validation inputs:
+  - [x] short/long text min/max length.
+  - [x] number min/max.
+  - [x] rating max.
+  - [x] date min/max.
+- [x] Public form renderer supports all field types.
 
 Acceptance:
 
-- Required field types from the problem statement are supported.
-- Options and validation can be configured and saved.
-- Public page renders all supported fields.
+- [x] Required field types from the problem statement are supported.
+- [x] Options and validation can be configured and saved.
+- [x] Public page renders all supported fields.
+
+Completed files:
+
+- `packages/database/models/form-field.ts`
+- `packages/database/drizzle/20260525163259_neat_legion/migration.sql`
+- `packages/services/form-field/model.ts`
+- `packages/services/form-field/index.ts`
+- `packages/services/form/index.ts`
+- `packages/trpc/server/routes/form/model.ts`
+- `packages/trpc/server/routes/form/route.ts`
+- `apps/web/hooks/api/form/index.ts`
+- `apps/web/app/dashboard/forms/[id]/page.tsx`
+- `apps/web/app/f/[slug]/page.tsx`
+- `apps/web/app/form/[form_id]/page.tsx`
+
+Verification completed:
+
+- [x] `pnpm db:generate` passed.
+- [x] `pnpm db:migrate` run by user.
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
 
 ## Priority 3: Public Submission Validation, Rate Limit, Email Events
 

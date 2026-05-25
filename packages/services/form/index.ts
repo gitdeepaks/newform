@@ -1,5 +1,6 @@
 import { and, count, db, eq, ne } from "@repo/database";
 import { formFieldsTable, formsTable } from "@repo/database/schema";
+import { formFieldTypeSchema } from "../form-field/model";
 import {
   createFormInputSchema,
   getFormByOwnerInputSchema,
@@ -141,6 +142,8 @@ class FormService {
           isRequired: formFieldsTable.isRequired,
           index: formFieldsTable.index,
           type: formFieldsTable.type,
+          options: formFieldsTable.options,
+          validation: formFieldsTable.validation,
           formId: formFieldsTable.formId,
           createdAt: formFieldsTable.createdAt,
           updatedAt: formFieldsTable.updatedAt,
@@ -159,7 +162,8 @@ class FormService {
     const { form } = firstRow;
     const fields = rows
       .map((row) => row.field)
-      .filter((field): field is NonNullable<typeof field> => field !== null);
+      .filter((field): field is NonNullable<typeof field> => field !== null)
+      .map((field) => ({ ...field, type: formFieldTypeSchema.parse(field.type) }));
 
     return {
       ...form,

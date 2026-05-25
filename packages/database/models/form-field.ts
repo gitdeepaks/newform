@@ -4,21 +4,28 @@ import {
   varchar,
   timestamp,
   boolean,
+  json,
   text,
   numeric,
-  pgEnum,
   unique,
 } from "drizzle-orm/pg-core";
-import { usersTable } from "./user";
 import { formsTable } from "./form";
 
-export const formFieldTypes = pgEnum("field_types_enum", [
-  "TEXT",
-  "NUMBER",
-  "EMAIL",
-  "YES_NO",
-  "PASSWORD",
-]);
+export type FormFieldOption = {
+  id: string;
+  label: string;
+  value: string;
+};
+
+export type FormFieldValidation = {
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  ratingMax?: number;
+  dateMin?: string;
+  dateMax?: string;
+};
 
 export const formFieldsTable = pgTable(
   "form_fields",
@@ -32,7 +39,9 @@ export const formFieldsTable = pgTable(
 
     index: numeric("index", { scale: 2 }).notNull(),
 
-    type: formFieldTypes("type").notNull(),
+    type: varchar("type", { length: 30 }).notNull(),
+    options: json("options").$type<FormFieldOption[] | null>(),
+    validation: json("validation").$type<FormFieldValidation | null>(),
 
     formId: uuid("form_id").references(() => formsTable.id),
 

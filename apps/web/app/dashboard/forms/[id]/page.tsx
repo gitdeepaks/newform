@@ -56,7 +56,17 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-const fieldTypes = ["TEXT", "NUMBER", "EMAIL", "YES_NO", "PASSWORD"] as const;
+const fieldTypes = [
+  "SHORT_TEXT",
+  "LONG_TEXT",
+  "EMAIL",
+  "NUMBER",
+  "SINGLE_SELECT",
+  "MULTI_SELECT",
+  "CHECKBOX",
+  "RATING",
+  "DATE",
+] as const;
 
 const fieldSchema = z.object({
   label: z.string().trim().min(1, "Label is required").max(100, "Label must be 100 characters or less"),
@@ -64,9 +74,32 @@ const fieldSchema = z.object({
   placeholder: z.string().trim().optional(),
   isRequired: z.boolean(),
   type: z.enum(fieldTypes),
+  optionsText: z.string().optional(),
+  minLength: z.string().optional(),
+  maxLength: z.string().optional(),
+  min: z.string().optional(),
+  max: z.string().optional(),
+  ratingMax: z.string().optional(),
+  dateMin: z.string().optional(),
+  dateMax: z.string().optional(),
 });
 
 type FieldValues = z.infer<typeof fieldSchema>;
+type FieldType = FieldValues["type"];
+type FieldOption = {
+  id: string;
+  label: string;
+  value: string;
+};
+type FieldValidation = {
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  ratingMax?: number;
+  dateMin?: string;
+  dateMax?: string;
+};
 
 const settingsSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(55),
@@ -95,10 +128,90 @@ const defaultFieldValues: FieldValues = {
   description: "",
   placeholder: "",
   isRequired: false,
-  type: "TEXT",
+  type: "SHORT_TEXT",
+  optionsText: "",
+  minLength: "",
+  maxLength: "",
+  min: "",
+  max: "",
+  ratingMax: "5",
+  dateMin: "",
+  dateMax: "",
 };
 
-const formatFieldType = (type: string) => type.replace("_", "/");
+const optionFieldTypes = new Set<FieldType>(["SINGLE_SELECT", "MULTI_SELECT", "CHECKBOX"]);
+
+const formatFieldType = (type: string) =>
+  type
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+const slugifyOption = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const parseOptions = (type: FieldType, optionsText?: string): FieldOption[] | null => {
+  if (!optionFieldTypes.has(type)) return null;
+
+  const uniqueOptions = new Map<string, FieldOption>();
+  for (const line of (optionsText ?? "").split("\n")) {
+    const label = line.trim();
+    const value = slugifyOption(label);
+    if (!label || !value || uniqueOptions.has(value)) continue;
+    uniqueOptions.set(value, { id: value, label, value });
+  }
+
+  return Array.from(uniqueOptions.values());
+};
+
+const optionalNumber = (value?: string) => {
+  if (!value || value.trim() === "") return undefined;
+  return Number(value);
+};
+
+const buildValidation = (values: FieldValues): FieldValidation | null => {
+  const validation: FieldValidation = {};
+
+  if (values.type === "SHORT_TEXT" || values.type === "LONG_TEXT") {
+    validation.minLength = optionalNumber(values.minLength);
+    validation.maxLength = optionalNumber(values.maxLength);
+  }
+
+  if (values.type === "NUMBER") {
+    validation.min = optionalNumber(values.min);
+    validation.max = optionalNumber(values.max);
+  }
+
+  if (values.type === "RATING") {
+    validation.ratingMax = optionalNumber(values.ratingMax);
+  }
+
+  if (values.type === "DATE") {
+    validation.dateMin = values.dateMin || undefined;
+    validation.dateMax = values.dateMax || undefined;
+  }
+
+  const hasValues = Object.values(validation).some((value) => value !== undefined && value !== "");
+  return hasValues ? validation : null;
+};
+
+const optionsToText = (options: FieldOption[] | null) =>
+  options?.map((option) => option.label).join("\n") ?? "";
+
+const validationToFieldValues = (validation: FieldValidation | null) => ({
+  minLength: validation?.minLength?.toString() ?? "",
+  maxLength: validation?.maxLength?.toString() ?? "",
+  min: validation?.min?.toString() ?? "",
+  max: validation?.max?.toString() ?? "",
+  ratingMax: validation?.ratingMax?.toString() ?? "5",
+  dateMin: validation?.dateMin ?? "",
+  dateMax: validation?.dateMax ?? "",
+});
 
 export default function FormBuilderPage({ params }: FormBuilderPageProps) {
   const { id } = use(params);
@@ -163,10 +276,14 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
 
     try {
       await createFieldAsync({
-        ...values,
         formId: id,
+        label: values.label,
         description: values.description || undefined,
         placeholder: values.placeholder || undefined,
+        isRequired: values.isRequired,
+        type: values.type,
+        options: parseOptions(values.type, values.optionsText),
+        validation: buildValidation(values),
         index: `${((fields?.length ?? 0) + 1).toFixed(2)}`,
       });
       toast.success("Field created successfully");
@@ -188,6 +305,8 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
       placeholder: field.placeholder ?? "",
       isRequired: field.isRequired ?? false,
       type: field.type,
+      optionsText: optionsToText(field.options),
+      ...validationToFieldValues(field.validation),
     });
     setEditOpen(true);
   }
@@ -199,9 +318,13 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
     try {
       await updateFieldAsync({
         id: editingFieldId,
-        ...values,
+        label: values.label,
+        isRequired: values.isRequired,
+        type: values.type,
         description: values.description || null,
         placeholder: values.placeholder || null,
+        options: parseOptions(values.type, values.optionsText),
+        validation: buildValidation(values),
       });
       toast.success("Field updated successfully");
       setEditOpen(false);
@@ -590,6 +713,13 @@ function FieldDialog({
   submitLabel: string;
   onSubmit: (values: FieldValues) => Promise<void>;
 }) {
+  const selectedType = form.watch("type");
+  const usesOptions = optionFieldTypes.has(selectedType);
+  const usesTextValidation = selectedType === "SHORT_TEXT" || selectedType === "LONG_TEXT";
+  const usesNumberValidation = selectedType === "NUMBER";
+  const usesRatingValidation = selectedType === "RATING";
+  const usesDateValidation = selectedType === "DATE";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -672,6 +802,138 @@ function FieldDialog({
                 </FormItem>
               )}
             />
+
+            {usesOptions ? (
+              <FormField
+                control={form.control}
+                name="optionsText"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Options</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        disabled={isSubmitting}
+                        placeholder={"One option per line\nAnime\nGaming\nStartups"}
+                        className="min-h-28 resize-none"
+                      />
+                    </FormControl>
+                    <p className="text-sm text-muted-foreground">Add at least two options.</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
+
+            {usesTextValidation ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="minLength"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Min length</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} inputMode="numeric" placeholder="0" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="maxLength"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max length</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} inputMode="numeric" placeholder="120" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : null}
+
+            {usesNumberValidation ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="min"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Min value</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} type="number" placeholder="0" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="max"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max value</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} type="number" placeholder="100" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : null}
+
+            {usesRatingValidation ? (
+              <FormField
+                control={form.control}
+                name="ratingMax"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rating scale</FormLabel>
+                    <FormControl>
+                      <Input {...field} disabled={isSubmitting} type="number" min="2" max="10" placeholder="5" />
+                    </FormControl>
+                    <p className="text-sm text-muted-foreground">Allowed range is 2 to 10.</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
+
+            {usesDateValidation ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="dateMin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Min date</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} type="date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dateMax"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max date</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} type="date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : null}
 
             <FormField
               control={form.control}

@@ -248,8 +248,8 @@ export const formRouter = router({
     })
     .input(createFieldInputSchema)
     .output(createFieldOutputSchema)
-    .mutation(async ({ input }) => {
-      const { id } = await formFieldService.createField(input);
+    .mutation(async ({ input, ctx }) => {
+      const { id } = await formFieldService.createField({ ...input, userId: ctx.user.id });
       return { id };
     }),
 
@@ -264,8 +264,8 @@ export const formRouter = router({
     })
     .input(getFieldsInputSchema)
     .output(getFieldsOutputSchema)
-    .query(async ({ input }) => {
-      const fields = await formFieldService.getFields(input);
+    .query(async ({ input, ctx }) => {
+      const fields = await formFieldService.getFields({ ...input, userId: ctx.user.id });
       return fields;
     }),
 
@@ -280,8 +280,8 @@ export const formRouter = router({
     })
     .input(updateFieldInputSchema)
     .output(updateFieldOutputSchema)
-    .mutation(async ({ input }) => {
-      const { id } = await formFieldService.updateField(input);
+    .mutation(async ({ input, ctx }) => {
+      const { id } = await formFieldService.updateField({ ...input, userId: ctx.user.id });
       return { id };
     }),
 
@@ -296,8 +296,8 @@ export const formRouter = router({
     })
     .input(deleteFieldInputSchema)
     .output(deleteFieldOutputSchema)
-    .mutation(async ({ input }) => {
-      const { id } = await formFieldService.deleteField(input);
+    .mutation(async ({ input, ctx }) => {
+      const { id } = await formFieldService.deleteField({ ...input, userId: ctx.user.id });
       return { id };
     }),
 });

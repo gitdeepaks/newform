@@ -27,8 +27,7 @@ type Field = NonNullable<ReturnType<typeof useFields>["fields"]>[number];
 
 function formatValue(field: Field, value: string | undefined) {
   if (value === undefined || value === "") return "—";
-  if (field.type === "YES_NO") return value === "true" ? "Yes" : "No";
-  if (field.type === "PASSWORD") return "••••••";
+  if (field.type === "CHECKBOX") return value === "true" ? "Yes" : value;
   return value;
 }
 

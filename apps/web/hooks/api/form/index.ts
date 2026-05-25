@@ -293,6 +293,8 @@ export const useCreateField = () => {
   } = trpc.form.createField.useMutation({
     onSuccess: async () => {
       await utils.form.getFields.invalidate();
+      await utils.form.getFormForOwner.invalidate();
+      await utils.form.getPublicFormBySlug.invalidate();
     },
   });
 
@@ -344,6 +346,8 @@ export const useUpdateField = () => {
   } = trpc.form.updateField.useMutation({
     onSuccess: async () => {
       await utils.form.getFields.invalidate();
+      await utils.form.getFormForOwner.invalidate();
+      await utils.form.getPublicFormBySlug.invalidate();
     },
   });
 
@@ -373,6 +377,8 @@ export const useDeleteField = () => {
   } = trpc.form.deleteField.useMutation({
     onSuccess: async () => {
       await utils.form.getFields.invalidate();
+      await utils.form.getFormForOwner.invalidate();
+      await utils.form.getPublicFormBySlug.invalidate();
     },
   });
 

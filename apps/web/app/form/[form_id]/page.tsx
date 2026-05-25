@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { useForm, useSubmitForm } from "@/hooks/api/form";
 import { use, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -20,11 +21,15 @@ type PublicFormPageProps = {
 type Field = NonNullable<ReturnType<typeof useForm>["form"]>["fields"][number];
 
 const inputTypeMap: Record<Field["type"], string> = {
-  TEXT: "text",
+  SHORT_TEXT: "text",
+  LONG_TEXT: "text",
   NUMBER: "number",
   EMAIL: "email",
-  PASSWORD: "password",
-  YES_NO: "checkbox",
+  SINGLE_SELECT: "text",
+  MULTI_SELECT: "text",
+  CHECKBOX: "checkbox",
+  RATING: "number",
+  DATE: "date",
 };
 
 export default function PublicFormPage({ params }: PublicFormPageProps) {
@@ -46,7 +51,7 @@ export default function PublicFormPage({ params }: PublicFormPageProps) {
     const missing = form.fields.filter((field) => {
       if (!field.isRequired) return false;
       const value = answers[field.id];
-      if (field.type === "YES_NO") return value !== true;
+      if (field.type === "CHECKBOX") return value !== true;
       return value === undefined || `${value}`.trim() === "";
     });
 
@@ -104,7 +109,7 @@ export default function PublicFormPage({ params }: PublicFormPageProps) {
               ) : (
                 <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
                   {form.fields.map((field) =>
-                    field.type === "YES_NO" ? (
+                    field.type === "CHECKBOX" ? (
                       <div
                         key={field.id}
                         className="flex flex-row items-center justify-between rounded-lg border p-3"
@@ -123,6 +128,24 @@ export default function PublicFormPage({ params }: PublicFormPageProps) {
                           checked={answers[field.id] === true}
                           disabled={submitFormIsPending}
                           onCheckedChange={(checked) => setAnswer(field.id, checked)}
+                        />
+                      </div>
+                    ) : field.type === "LONG_TEXT" ? (
+                      <div key={field.id} className="flex flex-col gap-2">
+                        <Label htmlFor={field.id}>
+                          {field.label}
+                          {field.isRequired ? <span className="text-destructive"> *</span> : null}
+                        </Label>
+                        {field.description ? (
+                          <p className="text-sm text-muted-foreground">{field.description}</p>
+                        ) : null}
+                        <Textarea
+                          id={field.id}
+                          placeholder={field.placeholder ?? undefined}
+                          required={field.isRequired ?? false}
+                          disabled={submitFormIsPending}
+                          value={(answers[field.id] as string) ?? ""}
+                          onChange={(event) => setAnswer(field.id, event.target.value)}
                         />
                       </div>
                     ) : (

@@ -97,7 +97,33 @@ export const getSubmissionsOutputSchema = z.array(
   }),
 );
 
-export const formFieldTypeSchema = z.enum(["TEXT", "NUMBER", "EMAIL", "YES_NO", "PASSWORD"]);
+export const formFieldTypeSchema = z.enum([
+  "SHORT_TEXT",
+  "LONG_TEXT",
+  "EMAIL",
+  "NUMBER",
+  "SINGLE_SELECT",
+  "MULTI_SELECT",
+  "CHECKBOX",
+  "RATING",
+  "DATE",
+]);
+
+export const formFieldOptionSchema = z.object({
+  id: z.string().min(1).max(80).describe("The option id"),
+  label: z.string().min(1).max(80).describe("The option label"),
+  value: z.string().min(1).max(80).describe("The option value"),
+});
+
+export const formFieldValidationSchema = z.object({
+  minLength: z.number().int().nonnegative().optional().describe("Minimum text length"),
+  maxLength: z.number().int().positive().optional().describe("Maximum text length"),
+  min: z.number().optional().describe("Minimum number value"),
+  max: z.number().optional().describe("Maximum number value"),
+  ratingMax: z.number().int().min(2).max(10).optional().describe("Maximum rating value"),
+  dateMin: z.string().optional().describe("Minimum date"),
+  dateMax: z.string().optional().describe("Maximum date"),
+});
 
 export const formFieldSchema = z.object({
   id: z.string().describe("The id of the form field"),
@@ -108,6 +134,8 @@ export const formFieldSchema = z.object({
   isRequired: z.boolean().nullable().describe("Whether the form field is required"),
   index: z.string().describe("The fractional index used to sort the form field"),
   type: formFieldTypeSchema.describe("The type of the form field"),
+  options: z.array(formFieldOptionSchema).nullable().describe("Options for option-based fields"),
+  validation: formFieldValidationSchema.nullable().describe("Validation rules for the field"),
   formId: z.string().nullable().describe("The id of the form this field belongs to"),
   createdAt: z.date().nullable().describe("The date the form field was created"),
   updatedAt: z.date().nullable().describe("The date the form field was last updated"),
@@ -156,6 +184,8 @@ export const createFieldInputSchema = z.object({
   index: z.string().describe("The fractional index used to sort the form field"),
   type: formFieldTypeSchema.describe("The type of the form field"),
   formId: z.string().describe("The id of the form this field belongs to"),
+  options: z.array(formFieldOptionSchema).nullable().optional().describe("Options for option-based fields"),
+  validation: formFieldValidationSchema.nullable().optional().describe("Validation rules for the field"),
 });
 
 export const createFieldOutputSchema = z.object({
@@ -176,6 +206,8 @@ export const updateFieldInputSchema = z.object({
   isRequired: z.boolean().optional().describe("Whether the form field is required"),
   index: z.string().optional().describe("The fractional index used to sort the form field"),
   type: formFieldTypeSchema.optional().describe("The type of the form field"),
+  options: z.array(formFieldOptionSchema).nullable().optional().describe("Options for option-based fields"),
+  validation: formFieldValidationSchema.nullable().optional().describe("Validation rules for the field"),
 });
 
 export const updateFieldOutputSchema = z.object({
