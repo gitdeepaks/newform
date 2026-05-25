@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { PanelLeftIcon } from "lucide-react"
+import { LogOutIcon, PanelLeftIcon } from "lucide-react"
 import { Slot } from "radix-ui"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -276,6 +276,26 @@ function SidebarTrigger({
       <PanelLeftIcon />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
+  )
+}
+
+function SidebarLogoutButton({
+  className,
+  isPending = false,
+  children,
+  ...props
+}: React.ComponentProps<typeof SidebarMenuButton> & {
+  isPending?: boolean
+}) {
+  return (
+    <SidebarMenuButton
+      className={cn("text-sidebar-foreground/80", className)}
+      disabled={isPending || props.disabled}
+      {...props}
+    >
+      <LogOutIcon />
+      <span>{children ?? (isPending ? "Logging out..." : "Log out")}</span>
+    </SidebarMenuButton>
   )
 }
 
@@ -709,6 +729,7 @@ export {
   SidebarHeader,
   SidebarInput,
   SidebarInset,
+  SidebarLogoutButton,
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuBadge,

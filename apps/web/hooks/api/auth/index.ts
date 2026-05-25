@@ -1,6 +1,18 @@
 "use client";
 
 import { trpc } from "@/trpc/client";
+import { env } from "@/env";
+
+type OAuthProvider = "google" | "github";
+
+export const useOAuthSignin = () => {
+  const startOAuth = (provider: OAuthProvider) => {
+    const apiOrigin = env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8000";
+    window.location.href = `${apiOrigin}/auth/${provider}/start`;
+  };
+
+  return { startOAuth };
+};
 
 export const useSignup = () => {
   const utils = trpc.useUtils();
@@ -55,6 +67,35 @@ export const useSignin = () => {
     signInUserWithEmailAndPasswordIsError,
     signInUserWithEmailAndPasswordIsIdle,
     signInUserWithEmailAndPasswordStatus,
+  };
+};
+
+export const useLogout = () => {
+  const utils = trpc.useUtils();
+  const {
+    mutateAsync: logoutAsync,
+    mutate: logout,
+    error: logoutError,
+    isPending: logoutIsPending,
+    isSuccess: logoutIsSuccess,
+    isError: logoutIsError,
+    isIdle: logoutIsIdle,
+    status: logoutStatus,
+  } = trpc.auth.logout.useMutation({
+    onSettled: async () => {
+      await utils.auth.getLoggedInUserInfo.reset();
+    },
+  });
+
+  return {
+    logoutAsync,
+    logout,
+    logoutError,
+    logoutIsPending,
+    logoutIsSuccess,
+    logoutIsError,
+    logoutIsIdle,
+    logoutStatus,
   };
 };
 

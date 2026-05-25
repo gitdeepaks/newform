@@ -19,12 +19,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useUser } from "@/hooks/api/auth";
 
 const data = {
-  user: {
-    name: "Newform Creator",
-    email: "demo@example.com",
-  },
   navMain: [
     {
       title: "Dashboard",
@@ -50,6 +47,12 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useUser();
+  const sidebarUser = {
+    name: user?.fullName ?? "Newform Creator",
+    email: user?.email ?? "",
+  };
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -70,7 +73,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={data.navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={sidebarUser} />
       </SidebarFooter>
     </Sidebar>
   );

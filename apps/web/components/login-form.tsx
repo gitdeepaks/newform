@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +15,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { useSignin } from "@/hooks/api/auth";
-import { useRouter } from "next/navigation";
+import { useOAuthSignin, useSignin } from "@/hooks/api/auth";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 type LoginFormValues = {
@@ -31,7 +32,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     signInUserWithEmailAndPasswordAsync,
     signInUserWithEmailAndPasswordIsPending,
   } = useSignin();
+  const { startOAuth } = useOAuthSignin();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("error")) {
+      toast.error("Social sign-in failed. Please try again.");
+    }
+  }, [searchParams]);
 
   const form = useForm<LoginFormValues>({
     defaultValues: {
@@ -75,6 +84,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         type="button"
         variant="outline"
         size="lg"
+        onClick={() => startOAuth("google")}
         className="h-10 w-full justify-center gap-2 border-input bg-background font-normal shadow-none hover:bg-accent/60"
       >
         Login with Google
@@ -83,6 +93,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         type="button"
         variant="outline"
         size="lg"
+        onClick={() => startOAuth("github")}
         className="h-10 w-full justify-center gap-2 border-input bg-background font-normal shadow-none hover:bg-accent/60"
       >
         Login with GitHub

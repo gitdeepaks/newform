@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -25,10 +25,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
-import { useSignup } from "@/hooks/api/auth";
+import { useOAuthSignin, useSignup } from "@/hooks/api/auth";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const signupSchema = z
   .object({
@@ -147,8 +147,10 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
     createUserWithEmailAndPasswordError,
     createUserWithEmailAndPasswordIsPending,
   } = useSignup();
+  const { startOAuth } = useOAuthSignin();
 
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -164,6 +166,12 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
   });
 
   const isSubmitting = form.formState.isSubmitting || createUserWithEmailAndPasswordIsPending;
+
+  useEffect(() => {
+    if (searchParams.get("error")) {
+      toast.error("Social sign-in failed. Please try again.");
+    }
+  }, [searchParams]);
 
   async function onSubmit(values: SignupFormValues) {
     setFormError(null);
@@ -204,14 +212,14 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
         <SocialButton
           disabled={isSubmitting}
           icon={<GoogleIcon />}
-          onClick={() => toast.message("Google sign-up is not configured yet")}
+          onClick={() => startOAuth("google")}
         >
           Continue with Google
         </SocialButton>
         <SocialButton
           disabled={isSubmitting}
           icon={<GitHubIcon />}
-          onClick={() => toast.message("GitHub sign-up is not configured yet")}
+          onClick={() => startOAuth("github")}
         >
           Continue with GitHub
         </SocialButton>

@@ -9,7 +9,7 @@ Required behavior:
 1. If a user is already logged in, they should not be able to stay on `/login` or `/signup`.
 2. If a user is not logged in, they should not be able to access dashboard pages.
 3. After successful login or signup, the user should go to `/dashboard` and browser back should not take them back into auth forms.
-4. The signup page brand text should change from `Acme Inc.` to `Newcode`.
+4. The signup page brand text should change from `Acme Inc.` to `NewForm`.
 5. The solution should stay simple, type-safe, and avoid casts.
 
 ## Current Auth Setup
@@ -237,7 +237,7 @@ apps/web/app/(auth)/signup/page.tsx
 Changes:
 
 1. Wrap page with `AuthGate mode="guest"`.
-2. Replace `Acme Inc.` with `Newcode`.
+2. Replace `Acme Inc.` with `NewForm`.
 
 Expected result:
 
@@ -262,7 +262,7 @@ export default function SignupPage() {
             <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <GalleryVerticalEnd className="size-4" />
             </div>
-            Newcode
+            NewForm
           </a>
           <SignupForm />
         </div>
@@ -460,7 +460,7 @@ Run through these cases after implementation:
 
 1. Logged-out user opens `/login`: login form appears.
 2. Logged-out user opens `/signup`: signup form appears.
-3. `/signup` shows `Newcode`, not `Acme Inc.`.
+3. `/signup` shows `NewForm`, not `Acme Inc.`.
 4. Logged-out user opens `/dashboard`: redirects to `/login`.
 5. Logged-out user opens `/dashboard/forms`: redirects to `/login`.
 6. Logged-in user opens `/login`: redirects to `/dashboard`.
@@ -481,7 +481,7 @@ Implement these changes first:
 2. Update `useSignin` cache invalidation.
 3. Guard `/login` with `mode="guest"`.
 4. Guard `/signup` with `mode="guest"`.
-5. Rename signup brand to `Newcode`.
+5. Rename signup brand to `NewForm`.
 6. Change login/signup success navigation to `router.replace("/dashboard")`.
 7. Guard dashboard pages with `mode="auth"`.
 8. Remove or replace dashboard `Open login` CTA.
