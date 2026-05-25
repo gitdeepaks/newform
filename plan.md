@@ -29,14 +29,14 @@ Implemented or partially implemented:
 - Dynamic field types are implemented end-to-end: short text, long text, email, number, single select, multi select, checkbox, rating, and date.
 - Field options and field validation config are stored in DB, validated in service, exposed through tRPC, and editable in builder UI.
 - Public slug form renderer supports all current field types.
+- Public slug submission is implemented with server-side validation, honeypot spam protection, IP + slug rate limiting, response event logging, and email event logging.
+- Form submissions now store respondent email, request metadata, and submitted timestamp.
+- Creator response reads now verify form ownership.
 
 Important gaps:
 
-- Public form submission still uses form id internally; final flow should move submission to slug-based `submitPublicResponse`.
 - `listPublicForms` API exists, but public explore/templates UI is still missing.
-- Response validation is too loose: submissions accept any field id/value array.
-- Creator ownership checks are still incomplete for submission reads.
-- Analytics, themes, template/explore page, seeded data, email events, rate limiting, landing, pricing, README polish are missing.
+- Analytics dashboard, themes, template/explore page, seeded data, landing, pricing, README polish are missing.
 
 ## Sprint Strategy
 
@@ -286,7 +286,7 @@ Verification completed:
 - [x] `pnpm check-types` passed.
 - [x] `pnpm build` passed.
 
-## Priority 3: Public Submission Validation, Rate Limit, Email Events
+## Priority 3: Public Submission Validation, Rate Limit, Email Events - Completed
 
 Target: hours 16-24.
 
@@ -294,66 +294,96 @@ Target: hours 16-24.
 
 Improve response storage:
 
-- Current `form_submissions` exists; either keep it and improve metadata or rename mentally as responses.
-- Add `respondentEmail` nullable.
-- Add `metadata` JSON.
-- Add `submittedAt` or use `createdAt`.
-- Add `email_events` table:
-  - `id`, `formId`, `submissionId`, `recipient`, `type`, `status`, `error`, `createdAt`.
-- Add `response_events` table if analytics needs views/starts/submits.
+- [x] Current `form_submissions` kept and improved.
+- [x] Add `respondentEmail` nullable.
+- [x] Add `metadata` JSON.
+- [x] Add `submittedAt`.
+- [x] Add `email_events` table:
+  - [x] `id`, `formId`, `submissionId`, `recipient`, `type`, `status`, `error`, `createdAt`.
+- [x] Add `response_events` table for submit events and future analytics.
 
 ### Service
 
 Update `FormSubmissionService`:
 
-- `submitPublicResponse({ slug, answers, honeypot, metadata })`.
-- Load form by slug.
-- Reject draft/unpublished/archived.
-- Reject expired forms.
-- Reject response limit reached.
-- Validate every answer against stored field schema.
-- Required checks happen server-side.
-- Select answers must match configured options.
-- Insert submission.
-- Insert submit event.
-- Create email event rows for creator/respondent.
+- [x] `submitPublicResponse({ slug, values, honeypot, metadata })`.
+- [x] Load form by slug.
+- [x] Reject draft/unpublished/archived.
+- [x] Reject expired forms.
+- [x] Reject response limit reached.
+- [x] Validate every answer against stored field schema.
+- [x] Required checks happen server-side, including empty multi-select/checkbox arrays.
+- [x] Select answers must match configured options.
+- [x] Insert submission.
+- [x] Insert submit event.
+- [x] Create email event rows for creator/respondent.
+- [x] Verify owner before reading form submissions.
 
 Add simple rate limiter:
 
-- In-memory map by `ip + slug` is acceptable for demo.
-- Limit: 5 submissions per 10 minutes.
-- Honeypot rejection.
+- [x] In-memory map by `ip + slug`.
+- [x] Limit: 5 submissions per 10 minutes.
+- [x] Honeypot rejection.
 
 ### tRPC Procedure
 
 Replace or add:
 
-- `submitPublicResponse` public.
-- Keep `submitForm` only if needed, but final UI should use slug-based procedure.
-- Add OpenAPI metadata.
+- [x] `submitPublicResponse` public.
+- [x] Keep `submitForm` temporarily for old route compatibility.
+- [x] Add OpenAPI metadata.
+- [x] Add request metadata to tRPC context from Express request headers.
 
 ### Hook
 
 Add:
 
-- `useSubmitPublicResponse()`.
+- [x] `useSubmitPublicResponse()`.
 
 ### UI
 
 Update `/f/[slug]`:
 
-- Load with `usePublicForm(slug)`.
-- Submit with `useSubmitPublicResponse()`.
-- Include hidden honeypot field.
-- Show closed/unavailable states.
-- Show custom thank-you state.
+- [x] Load with `usePublicForm(slug)`.
+- [x] Submit with `useSubmitPublicResponse()`.
+- [x] Include hidden honeypot field.
+- [x] Show closed/unavailable states.
+- [x] Show custom thank-you state.
 
 Acceptance:
 
-- Public users submit without login.
-- Server rejects invalid answers.
-- Rapid spam is blocked.
-- Email events are recorded without breaking submission.
+- [x] Public users submit without login.
+- [x] Server rejects invalid answers.
+- [x] Rapid spam is blocked.
+- [x] Email events are recorded without breaking submission.
+
+Completed files:
+
+- `packages/database/models/form-submission.ts`
+- `packages/database/models/response-event.ts`
+- `packages/database/models/email-event.ts`
+- `packages/database/schema.ts`
+- `packages/database/drizzle/20260525172050_mute_boom_boom/migration.sql`
+- `packages/database/drizzle/20260525172050_mute_boom_boom/snapshot.json`
+- `packages/services/form-submission/model.ts`
+- `packages/services/form-submission/index.ts`
+- `packages/trpc/server/context.ts`
+- `packages/trpc/server/routes/form/model.ts`
+- `packages/trpc/server/routes/form/route.ts`
+- `apps/web/hooks/api/form/index.ts`
+- `apps/web/app/f/[slug]/page.tsx`
+
+Verification completed:
+
+- [x] `pnpm db:migrate` run by user.
+- [x] Valid `/f/[slug]` submission works.
+- [x] Server-side invalid payload checks verified.
+- [x] Required multi-select empty array check verified.
+- [x] Honeypot rejection verified.
+- [x] Rate limiting verified.
+- [x] `form_submissions`, `response_events`, and `email_events` rows verified.
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
 
 ## Priority 4: Responses And Analytics
 
