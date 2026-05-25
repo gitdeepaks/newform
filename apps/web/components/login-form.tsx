@@ -29,7 +29,6 @@ const authInputClassName =
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
   const {
     signInUserWithEmailAndPasswordAsync,
-    signInUserWithEmailAndPasswordError,
     signInUserWithEmailAndPasswordIsPending,
   } = useSignin();
   const router = useRouter();
@@ -42,15 +41,17 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   });
 
   async function onSubmit(values: LoginFormValues) {
-    console.log(values);
-    const { id } = await signInUserWithEmailAndPasswordAsync({
-      email: values.email,
-      password: values.password,
-    });
-    if (id) {
-      router.push("/dashboard");
-      toast.success("Login successful");
-    } else {
+    try {
+      const { id } = await signInUserWithEmailAndPasswordAsync({
+        email: values.email,
+        password: values.password,
+      });
+
+      if (id) {
+        router.push("/dashboard");
+        toast.success("Login successful");
+      }
+    } catch {
       toast.error("Invalid email or password");
     }
   }
@@ -145,8 +146,13 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
             )}
           />
 
-          <Button type="submit" size="lg" className="mt-1 h-10 w-full font-medium">
-            Continue
+          <Button
+            type="submit"
+            size="lg"
+            className="mt-1 h-10 w-full font-medium"
+            disabled={signInUserWithEmailAndPasswordIsPending}
+          >
+            {signInUserWithEmailAndPasswordIsPending ? "Signing in..." : "Continue"}
           </Button>
         </form>
       </Form>
