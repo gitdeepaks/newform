@@ -1,9 +1,11 @@
-import { db, eq } from "@repo/database";
+import { and, db, eq } from "@repo/database";
 import { createHmac, randomBytes } from "node:crypto";
-import { usersTable } from "@repo/database/schema";
+import { userAccountsTable, usersTable } from "@repo/database/schema";
 import {
   createUserWithEmailAndPasswordInputSchema,
   CreateUserWithEmailAndPasswordInputSchemaType,
+  findOrCreateOAuthUserInputSchema,
+  type FindOrCreateOAuthUserInput,
   generateUserTokenPayload,
   signInUserWithEmailAndPasswordInputSchema,
   type GenerateUserTokenPayloadType,
@@ -19,6 +21,25 @@ class UserService {
       return null;
     }
     return result[0];
+  }
+
+  private async getOAuthAccount(provider: string, providerAccountId: string) {
+    const result = await db
+      .select()
+      .from(userAccountsTable)
+      .where(
+        and(
+          eq(userAccountsTable.provider, provider),
+          eq(userAccountsTable.providerAccountId, providerAccountId),
+        ),
+      );
+
+    return result[0] ?? null;
+  }
+
+  private async getUserById(id: string) {
+    const result = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    return result[0] ?? null;
   }
 
   private verifyUserToken(token: string): GenerateUserTokenPayloadType {
@@ -127,6 +148,84 @@ class UserService {
       id: existingUser.id,
       token,
     };
+  }
+
+  public async findOrCreateOAuthUser(input: FindOrCreateOAuthUserInput) {
+    const profile = await findOrCreateOAuthUserInputSchema.parseAsync(input);
+
+    if (!profile.emailVerified) {
+      throw new Error("OAuth email must be verified");
+    }
+
+    const existingAccount = await this.getOAuthAccount(
+      profile.provider,
+      profile.providerAccountId,
+    );
+
+    if (existingAccount) {
+      const linkedUser = await this.getUserById(existingAccount.userId);
+      if (!linkedUser) {
+        throw new Error("Linked OAuth user does not exist");
+      }
+
+      const { token } = await this.generateUserToken({ id: linkedUser.id });
+      return { id: linkedUser.id, token };
+    }
+
+    const userId = await db.transaction(async (tx) => {
+      const existingUser = await tx
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.email, profile.email));
+
+      const user = existingUser[0];
+
+      if (user) {
+        await tx
+          .insert(userAccountsTable)
+          .values({
+            userId: user.id,
+            provider: profile.provider,
+            providerAccountId: profile.providerAccountId,
+          });
+
+        await tx
+          .update(usersTable)
+          .set({
+            emailVerified: true,
+            profileImageUrl: user.profileImageUrl ?? profile.profileImageUrl,
+          })
+          .where(eq(usersTable.id, user.id));
+
+        return user.id;
+      }
+
+      const createdUser = await tx
+        .insert(usersTable)
+        .values({
+          email: profile.email,
+          fullName: profile.fullName,
+          emailVerified: true,
+          profileImageUrl: profile.profileImageUrl,
+        })
+        .returning({ id: usersTable.id });
+
+      const createdUserId = createdUser[0]?.id;
+      if (!createdUserId) {
+        throw new Error("Failed to create OAuth user");
+      }
+
+      await tx.insert(userAccountsTable).values({
+        userId: createdUserId,
+        provider: profile.provider,
+        providerAccountId: profile.providerAccountId,
+      });
+
+      return createdUserId;
+    });
+
+    const { token } = await this.generateUserToken({ id: userId });
+    return { id: userId, token };
   }
 
   public async verifyAndDecodeuserToken(token: string) {

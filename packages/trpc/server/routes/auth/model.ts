@@ -31,3 +31,11 @@ export const getLoggedInputUserInfoOutputModel = z.object({
   fullName: z.string().describe("The full name of the user"),
   profileImageUrl: z.string().optional().describe("The profile image url of the user"),
 });
+
+export const getOAuthProvidersOutputSchema = z.object({
+  providers: z.array(z.enum(["google", "github"])),
+});
+
+export const logoutOutputSchema = z.object({
+  success: z.boolean(),
+});

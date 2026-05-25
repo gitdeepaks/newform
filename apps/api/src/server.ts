@@ -10,6 +10,7 @@ import cookieParser from "cookie-parser";
 import { serverRouter, createContext } from "@repo/trpc/server";
 
 import { env } from "./env";
+import { oauthRouter } from "./routes/oauth";
 
 export const app = express();
 const openApiDocument = generateOpenApiDocument(serverRouter, {
@@ -30,6 +31,8 @@ if (env.NODE_ENV !== "prod") {
 app.use(cookieParser());
 
 app.use(express.json());
+
+app.use("/auth", oauthRouter);
 
 app.get("/", (req, res) => {
   return res.json({ message: "Streamyst is up and running..." });

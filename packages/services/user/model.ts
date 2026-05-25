@@ -23,3 +23,17 @@ export const signInUserWithEmailAndPasswordInputSchema = z.object({
 export type SignInUserWithEmailAndPasswordInputSchemaType = z.infer<
   typeof signInUserWithEmailAndPasswordInputSchema
 >;
+
+export const oauthProviderSchema = z.enum(["google", "github"]);
+export type OAuthProvider = z.infer<typeof oauthProviderSchema>;
+
+export const findOrCreateOAuthUserInputSchema = z.object({
+  provider: oauthProviderSchema,
+  providerAccountId: z.string().trim().min(1),
+  email: z.email(),
+  emailVerified: z.boolean(),
+  fullName: z.string().trim().min(1).max(80),
+  profileImageUrl: z.url().optional(),
+});
+
+export type FindOrCreateOAuthUserInput = z.infer<typeof findOrCreateOAuthUserInputSchema>;

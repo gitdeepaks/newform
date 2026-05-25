@@ -2,13 +2,19 @@ import { TRPCError } from "@trpc/server";
 import { userService } from "../../services";
 
 import { protectedProcedure, publicProcedure, router } from "../../trpc";
-import { getAuthenticationCookie, setAuthenticationCookie } from "../../utils/cookie";
+import {
+  clearAuthenticationCookie,
+  getAuthenticationCookie,
+  setAuthenticationCookie,
+} from "../../utils/cookie";
 import { generatePath } from "../../utils/path-generator";
 import {
   createUserWithEmailAndPasswordInputSchema,
   createUserWithEmailAndPasswordOutputSchema,
   getLoggedInputUserInfoInputModel,
   getLoggedInputUserInfoOutputModel,
+  getOAuthProvidersOutputSchema,
+  logoutOutputSchema,
   signInUserWithEmailAndPasswordInputSchema,
   signInUserWithEmailAndPasswordOutputSchema,
 } from "./model";
@@ -17,6 +23,18 @@ const TAGS = ["Authentication"];
 const getPath = generatePath("/authentication");
 
 export const authRouter = router({
+  getOAuthProviders: publicProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: getPath("/getOAuthProviders"),
+        tags: TAGS,
+      },
+    })
+    .input(getLoggedInputUserInfoInputModel)
+    .output(getOAuthProvidersOutputSchema)
+    .query(() => ({ providers: ["google", "github"] })),
+
   createUserWithEmailAndPassword: publicProcedure
     .meta({
       openapi: {
@@ -84,5 +102,20 @@ export const authRouter = router({
       );
 
       return { id, email, profileImageUrl, fullName };
+    }),
+
+  logout: publicProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: getPath("/logout"),
+        tags: TAGS,
+      },
+    })
+    .input(getLoggedInputUserInfoInputModel)
+    .output(logoutOutputSchema)
+    .mutation(({ ctx }) => {
+      clearAuthenticationCookie(ctx);
+      return { success: true };
     }),
 });
