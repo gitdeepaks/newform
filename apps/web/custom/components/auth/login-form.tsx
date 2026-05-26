@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { useOAuthProviders, useOAuthSignin, useSignin } from "@/hooks/api/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Github } from "lucide-react";
+import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 
 type LoginFormValues = {
@@ -30,10 +30,8 @@ const authInputClassName =
   "h-10 border-input bg-background shadow-none focus-visible:ring-2 focus-visible:ring-ring/30";
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
-  const {
-    signInUserWithEmailAndPasswordAsync,
-    signInUserWithEmailAndPasswordIsPending,
-  } = useSignin();
+  const { signInUserWithEmailAndPasswordAsync, signInUserWithEmailAndPasswordIsPending } =
+    useSignin();
   const { startOAuth } = useOAuthSignin();
   const { providers, providersIsLoading } = useOAuthProviders();
   const router = useRouter();
@@ -108,7 +106,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
           onClick={() => startOAuth("github")}
           className="h-10 w-full justify-center gap-2 border-input bg-background font-normal shadow-none hover:bg-accent/60"
         >
-          <Github size={18} className="shrink-0" />
+          <FaGithub size={18} className="shrink-0" />
           {providersIsLoading ? "Checking GitHub..." : "Login with GitHub"}
         </Button>
         {!providersIsLoading && !googleIsAvailable && !githubIsAvailable ? (
@@ -120,7 +118,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
       <div className="relative flex items-center gap-3">
         <Separator className="flex-1" />
-        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">or</span>
+        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          or
+        </span>
         <Separator className="flex-1" />
       </div>
 

@@ -15,6 +15,11 @@ export const createFormInputSchema = z.object({
   createdBy: z.string().describe("The id of the user creating the form"),
 });
 
+export const cloneFormInputSchema = z.object({
+  formId: z.string().describe("The id of the form to clone"),
+  userId: z.string().describe("The id of the form owner"),
+});
+
 export const listFromByUserIdInputSchema = z.object({
   userId: z.string().describe("The id of the user who created the forms"),
 });
@@ -61,6 +66,7 @@ export const getPublicRedirectByIdInputSchema = z.object({
 export const listPublicFormsInputSchema = z.undefined();
 
 export type CreateFormInputSchemaType = z.infer<typeof createFormInputSchema>;
+export type CloneFormInputSchemaType = z.infer<typeof cloneFormInputSchema>;
 export type ListFromByUserIdInputSchemaType = z.infer<typeof listFromByUserIdInputSchema>;
 export type GetFormByIdInputSchemaType = z.infer<typeof getFormByIdInputSchema>;
 export type GetFormByOwnerInputSchemaType = z.infer<typeof getFormByOwnerInputSchema>;

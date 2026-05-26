@@ -31,6 +31,22 @@ export const useCreateForm = () => {
   };
 };
 
+export const useCloneForm = () => {
+  const utils = trpc.useUtils();
+  const mutation = trpc.form.cloneForm.useMutation({
+    onSuccess: async () => {
+      await utils.form.listForms.invalidate();
+    },
+  });
+
+  return {
+    cloneFormAsync: mutation.mutateAsync,
+    cloneForm: mutation.mutate,
+    cloneFormError: mutation.error,
+    cloneFormIsPending: mutation.isPending,
+  };
+};
+
 export const useForms = () => {
   const {
     data: forms,

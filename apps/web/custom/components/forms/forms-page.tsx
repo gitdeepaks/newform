@@ -31,11 +31,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateForm, useForms } from "@/hooks/api/form";
+import { useCloneForm, useCreateForm, useForms } from "@/hooks/api/form";
 import { DashboardShell } from "@/custom/components/dashboard/dashboard-shell";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowUpRightIcon, CopyIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -49,8 +50,10 @@ const createFormSchema = z.object({
 type CreateFormValues = z.infer<typeof createFormSchema>;
 
 export function FormsPage() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const { cloneFormAsync, cloneFormIsPending } = useCloneForm();
   const { createFormAsync, createFormError, createFormIsPending } = useCreateForm();
   const { forms, formsError, formsIsLoading } = useForms();
 
@@ -87,6 +90,17 @@ export function FormsPage() {
     const url = `${window.location.origin}/f/${slug}`;
     await navigator.clipboard.writeText(url);
     toast.success("Share link copied");
+  }
+
+  async function onCloneForm(formId: string) {
+    try {
+      const clonedForm = await cloneFormAsync({ formId });
+      toast.success("Form cloned");
+      router.push(`/dashboard/forms/${clonedForm.id}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to clone form";
+      toast.error(message);
+    }
   }
 
   return (
@@ -127,7 +141,7 @@ export function FormsPage() {
                       <TableHead className="hidden lg:table-cell">Visibility</TableHead>
                       <TableHead className="hidden md:table-cell">Description</TableHead>
                       <TableHead className="hidden sm:table-cell">Created</TableHead>
-                      <TableHead className="w-44 text-right">Action</TableHead>
+                      <TableHead className="w-56 text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -165,6 +179,16 @@ export function FormsPage() {
                                 <span className="sr-only">Copy share link</span>
                               </Button>
                             ) : null}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={cloneFormIsPending}
+                              onClick={() => onCloneForm(userForm.id)}
+                            >
+                              Clone
+                              <CopyIcon />
+                            </Button>
                             <Button asChild variant="ghost" size="sm">
                               <Link href={`/dashboard/forms/${userForm.id}`}>
                                 Builder

@@ -1,7 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { EyeIcon, EyeOffIcon, Github } from "lucide-react";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
+import { FaGithub } from "react-icons/fa";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -194,7 +195,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
         </SocialButton>
         <SocialButton
           disabled={providersIsLoading || isSubmitting || !githubIsAvailable}
-          icon={<Github size={18} />}
+          icon={<FaGithub size={18} className="shrink-0" />}
           onClick={() => startOAuth("github")}
         >
           {providersIsLoading ? "Checking GitHub..." : "Continue with GitHub"}
@@ -208,7 +209,9 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
 
       <div className="relative flex items-center gap-3">
         <Separator className="flex-1" />
-        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">or</span>
+        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          or
+        </span>
         <Separator className="flex-1" />
       </div>
 

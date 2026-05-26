@@ -10,6 +10,15 @@ export const createFormOutputSchema = z.object({
   slug: z.string().describe("The slug of the form"),
 });
 
+export const cloneFormInputSchema = z.object({
+  formId: z.string().describe("The id of the form to clone"),
+});
+
+export const cloneFormOutputSchema = z.object({
+  id: z.string().describe("The id of the cloned form"),
+  slug: z.string().describe("The slug of the cloned form"),
+});
+
 export const listFormsInputSchema = z.undefined();
 
 export const formStatusSchema = z.enum(["draft", "published", "archived"]);

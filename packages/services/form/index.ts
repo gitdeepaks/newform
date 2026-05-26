@@ -3,6 +3,7 @@ import { formFieldsTable, formsTable, formSubmissionsTable, themesTable } from "
 import type { ThemeTokens } from "@repo/database/schema";
 import { formFieldTypeSchema } from "../form-field/model";
 import {
+  cloneFormInputSchema,
   createFormInputSchema,
   getFormByOwnerInputSchema,
   getFormByIdInputSchema,
@@ -15,6 +16,7 @@ import {
   updateFormInputSchema,
   updateSlugInputSchema,
   updateVisibilityInputSchema,
+  type CloneFormInputSchemaType,
   type CreateFormInputSchemaType,
   type GetFormByOwnerInputSchemaType,
   type GetFormByIdInputSchemaType,
@@ -87,6 +89,11 @@ class FormService {
     }
   }
 
+  private cloneTitle(title: string) {
+    const nextTitle = `Copy of ${title}`;
+    return nextTitle.length > 55 ? nextTitle.slice(0, 55).trim() : nextTitle;
+  }
+
   public async createForm(input: CreateFormInputSchemaType) {
     const { title, description, createdBy } = await createFormInputSchema.parseAsync(input);
     const slug = await this.ensureUniqueSlug(createSlugFromTitle(title));
@@ -114,6 +121,91 @@ class FormService {
       id: formInsertResult[0].id,
       slug: formInsertResult[0].slug,
     };
+  }
+
+  public async cloneForm(input: CloneFormInputSchemaType) {
+    const { formId, userId } = await cloneFormInputSchema.parseAsync(input);
+    await this.assertFormOwner(formId, userId);
+
+    const sourceRows = await db
+      .select({
+        id: formsTable.id,
+        title: formsTable.title,
+        description: formsTable.description,
+        thankYouTitle: formsTable.thankYouTitle,
+        thankYouMessage: formsTable.thankYouMessage,
+        themeId: formsTable.themeId,
+      })
+      .from(formsTable)
+      .where(eq(formsTable.id, formId))
+      .limit(1);
+
+    const sourceForm = sourceRows[0];
+    if (!sourceForm) throw new Error(`Form With ${formId} Not Found`);
+
+    const sourceFields = await db
+      .select({
+        label: formFieldsTable.label,
+        description: formFieldsTable.description,
+        labelKey: formFieldsTable.labelKey,
+        placeholder: formFieldsTable.placeholder,
+        isRequired: formFieldsTable.isRequired,
+        index: formFieldsTable.index,
+        type: formFieldsTable.type,
+        options: formFieldsTable.options,
+        validation: formFieldsTable.validation,
+      })
+      .from(formFieldsTable)
+      .where(eq(formFieldsTable.formId, formId))
+      .orderBy(formFieldsTable.index);
+
+    const title = this.cloneTitle(sourceForm.title);
+    const slug = await this.ensureUniqueSlug(createSlugFromTitle(title));
+
+    return db.transaction(async (tx) => {
+      const formInsertResult = await tx
+        .insert(formsTable)
+        .values({
+          title,
+          description: sourceForm.description,
+          slug,
+          status: "draft",
+          visibility: "unlisted",
+          publishedAt: null,
+          expiresAt: null,
+          responseLimit: null,
+          themeId: sourceForm.themeId,
+          thankYouTitle: sourceForm.thankYouTitle,
+          thankYouMessage: sourceForm.thankYouMessage,
+          createdBy: userId,
+        })
+        .returning({
+          id: formsTable.id,
+          slug: formsTable.slug,
+        });
+
+      const clonedForm = formInsertResult[0];
+      if (!clonedForm?.id) throw new Error("Failed to clone form");
+
+      if (sourceFields.length > 0) {
+        await tx.insert(formFieldsTable).values(
+          sourceFields.map((field) => ({
+            formId: clonedForm.id,
+            label: field.label,
+            description: field.description,
+            labelKey: field.labelKey,
+            placeholder: field.placeholder,
+            isRequired: field.isRequired,
+            index: field.index,
+            type: field.type,
+            options: field.options,
+            validation: field.validation,
+          })),
+        );
+      }
+
+      return clonedForm;
+    });
   }
 
   public async listFromByUserId(input: ListFromByUserIdInputSchemaType) {

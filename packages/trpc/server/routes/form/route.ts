@@ -4,6 +4,8 @@ import { generatePath } from "../../utils/path-generator";
 import {
   createFieldInputSchema,
   createFieldOutputSchema,
+  cloneFormInputSchema,
+  cloneFormOutputSchema,
   assignThemeInputSchema,
   assignThemeOutputSchema,
   createFormInputSchema,
@@ -67,6 +69,21 @@ export const formRouter = router({
       });
 
       return { id, slug };
+    }),
+
+  cloneForm: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: getPath("/cloneForm"),
+        tags: TAGS,
+        protect: true,
+      },
+    })
+    .input(cloneFormInputSchema)
+    .output(cloneFormOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return formService.cloneForm({ ...input, userId: ctx.user.id });
     }),
 
   getFormForOwner: protectedProcedure
