@@ -128,19 +128,34 @@
   h3 {
     letter-spacing: -0.04em;
   }
+
+  [data-slot="button"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
 }
 
 @layer utilities {
   .monokai-grid {
     background-image:
-      linear-gradient(to right, color-mix(in srgb, var(--border) 48%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in srgb, var(--border) 48%, transparent) 1px, transparent 1px);
+      linear-gradient(
+        to right,
+        color-mix(in srgb, var(--border) 48%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--border) 48%, transparent) 1px,
+        transparent 1px
+      );
     background-size: 48px 48px;
     mask-image: linear-gradient(to bottom, black 0%, black 58%, transparent 100%);
   }
 
   .monokai-noise {
-    background-image: radial-gradient(color-mix(in srgb, var(--primary) 42%, transparent) 1px, transparent 1px);
+    background-image: radial-gradient(
+      color-mix(in srgb, var(--primary) 42%, transparent) 1px,
+      transparent 1px
+    );
     background-size: 22px 22px;
   }
 }
