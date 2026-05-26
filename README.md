@@ -23,7 +23,7 @@ The project is designed as a SaaS foundation, not only a hackathon prototype. Co
 - **API:** Express, tRPC, trpc-to-openapi, Scalar API docs
 - **Database:** PostgreSQL, Drizzle ORM, Drizzle Kit migrations
 - **Validation:** Zod
-- **Auth:** Cookie-based JWT auth, email/password, optional Google/GitHub OAuth
+- **Auth:** Cookie-based JWT auth, email/password, optional Google OAuth
 - **Language:** TypeScript
 
 ## Repository Structure
@@ -228,9 +228,6 @@ Optional OAuth variables:
 GOOGLE_OAUTH_CLIENT_ID=
 GOOGLE_OAUTH_CLIENT_SECRET=
 GOOGLE_OAUTH_REDIRECT_URI=
-GITHUB_OAUTH_CLIENT_ID=
-GITHUB_OAUTH_CLIENT_SECRET=
-GITHUB_OAUTH_REDIRECT_URI=
 ```
 
 Production domain recommendation:
