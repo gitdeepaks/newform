@@ -13,6 +13,8 @@ import {
 
 const demoEmail = "demo@example.com";
 const demoPassword = "password123";
+const adminEmail = "admin@example.com";
+const adminPassword = "password123";
 const themeNames = ["Aurora Studio", "Midnight Arcade", "Paper Garden"];
 const seededSlugs = [
   "anime-convention-feedback",
@@ -80,6 +82,31 @@ const field = (label: string, type: string, index: number, options?: string[]) =
 });
 
 async function main() {
+  const existingAdmin = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.email, adminEmail))
+    .limit(1);
+
+  if (existingAdmin[0]) {
+    await db
+      .update(usersTable)
+      .set({ role: "admin", status: "active", emailVerified: true })
+      .where(eq(usersTable.id, existingAdmin[0].id));
+  } else {
+    const salt = randomBytes(16).toString("hex");
+    const password = createHmac("sha256", salt).update(adminPassword).digest("hex");
+    await db.insert(usersTable).values({
+      email: adminEmail,
+      fullName: "Admin User",
+      salt,
+      password,
+      emailVerified: true,
+      role: "admin",
+      status: "active",
+    });
+  }
+
   const existingUser = await db.select().from(usersTable).where(eq(usersTable.email, demoEmail)).limit(1);
   let userId = existingUser[0]?.id;
 
@@ -222,7 +249,7 @@ async function main() {
     );
   }
 
-  console.log("Seeded demo user, themes, forms, fields, submissions, and response events.");
+  console.log("Seeded admin user, demo user, themes, forms, fields, submissions, and response events.");
 }
 
 main().catch((error) => {

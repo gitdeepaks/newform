@@ -17,11 +17,24 @@ export const protectedProcedure = tRPCContext.procedure.use(async (options) => {
   if (!token) throw new TRPCError({ code: "UNAUTHORIZED", message: "User is not logged in" });
 
   const { id } = await userService.verifyAndDecodeuserToken(token);
+  const user = await userService.getUserInfoById(id);
+
+  if (user.status === "suspended") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "User account is suspended" });
+  }
 
   return options.next({
     ctx: {
       ...ctx,
-      user: { id },
+      user: { id: user.id, role: user.role, status: user.status },
     },
   });
+});
+
+export const adminProcedure = protectedProcedure.use(async (options) => {
+  if (options.ctx.user.role !== "admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+  }
+
+  return options.next({ ctx: options.ctx });
 });

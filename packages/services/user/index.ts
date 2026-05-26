@@ -8,6 +8,8 @@ import {
   type FindOrCreateOAuthUserInput,
   generateUserTokenPayload,
   signInUserWithEmailAndPasswordInputSchema,
+  userRoleSchema,
+  userStatusSchema,
   type GenerateUserTokenPayloadType,
   type SignInUserWithEmailAndPasswordInputSchemaType,
 } from "./model";
@@ -68,6 +70,8 @@ class UserService {
         email: usersTable.email,
         fullName: usersTable.fullName,
         profileImageUrl: usersTable.profileImageUrl,
+        role: usersTable.role,
+        status: usersTable.status,
       })
       .from(usersTable)
       .where(eq(usersTable.id, id));
@@ -75,8 +79,13 @@ class UserService {
     if (!user || user.length === 0 || !user[0]) {
       throw new Error(`User With ${id} Not Found`);
     }
-    const { profileImageUrl, ...rest } = user[0];
-    return { ...rest, profileImageUrl: profileImageUrl ?? undefined };
+    const { profileImageUrl, role, status, ...rest } = user[0];
+    return {
+      ...rest,
+      profileImageUrl: profileImageUrl ?? undefined,
+      role: userRoleSchema.parse(role),
+      status: userStatusSchema.parse(status),
+    };
   }
   private async generateUserToken(payload: GenerateUserTokenPayloadType) {
     const { id } = await generateUserTokenPayload.parseAsync(payload);

@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+export const userRoleSchema = z.enum(["user", "admin"]);
+export const userStatusSchema = z.enum(["active", "suspended"]);
+export type UserRole = z.infer<typeof userRoleSchema>;
+export type UserStatus = z.infer<typeof userStatusSchema>;
+
 export const createUserWithEmailAndPasswordInputSchema = z.object({
   fullName: z.string().min(1).max(80).describe("The full name of the user"),
   email: z.email().describe("The email of the user"),

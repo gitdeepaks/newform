@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { userRoleSchema, userStatusSchema } from "@repo/services/user/model";
 
 export const createUserWithEmailAndPasswordInputSchema = z.object({
   fullName: z.string().min(1).max(80).describe("The full name of the user"),
@@ -30,6 +31,8 @@ export const getLoggedInputUserInfoOutputModel = z.object({
   email: z.email().describe("The email of the user"),
   fullName: z.string().describe("The full name of the user"),
   profileImageUrl: z.string().optional().describe("The profile image url of the user"),
+  role: userRoleSchema,
+  status: userStatusSchema,
 });
 
 export const getOAuthProvidersOutputSchema = z.object({

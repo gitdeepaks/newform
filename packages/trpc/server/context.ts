@@ -1,8 +1,11 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
+import type { UserRole, UserStatus } from "@repo/services/user/model";
 import { clearCookieFactory, createCookieFactory, getCookieFactory } from "./utils/cookie";
 
 export interface TRPCCtxUser {
   id: string;
+  role: UserRole;
+  status: UserStatus;
 }
 
 export interface TRPCContext {

@@ -6,6 +6,7 @@ import {
   IconDashboard,
   IconLayoutCards,
   IconReceipt,
+  IconShieldLock,
 } from "@tabler/icons-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -52,6 +53,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     name: user?.fullName ?? "Newform Creator",
     email: user?.email ?? "",
   };
+  const navMain = user?.role === "admin"
+    ? [...data.navMain, { title: "Admin", url: "/admin", icon: IconShieldLock }]
+    : data.navMain;
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -70,7 +74,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={sidebarUser} />

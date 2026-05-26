@@ -103,11 +103,11 @@ export const authRouter = router({
       const token = getAuthenticationCookie(ctx);
       if (!token) throw new TRPCError({ code: "UNAUTHORIZED", message: "User is not logged in" });
 
-      const { id, email, profileImageUrl, fullName } = await userService.getUserInfoById(
+      const { id, email, profileImageUrl, fullName, role, status } = await userService.getUserInfoById(
         ctx.user.id,
       );
 
-      return { id, email, profileImageUrl, fullName };
+      return { id, email, profileImageUrl, fullName, role, status };
     }),
 
   logout: publicProcedure
