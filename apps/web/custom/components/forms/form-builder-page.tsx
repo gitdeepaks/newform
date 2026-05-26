@@ -51,7 +51,7 @@ import {
 } from "@/hooks/api/form";
 import { DashboardShell } from "@/custom/components/dashboard/dashboard-shell";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CopyIcon, ExternalLinkIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, DownloadIcon, ExternalLinkIcon, PencilIcon, PlusIcon, QrCodeIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
 import { useForm } from "react-hook-form";
@@ -251,6 +251,11 @@ export function FormBuilderPage({ formId: id }: FormBuilderPageProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [qrShareUrl, setQrShareUrl] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [qrIsLoading, setQrIsLoading] = useState(false);
 
   const { form: ownerForm, formError: ownerFormError, formIsLoading: ownerFormIsLoading } =
     useOwnerForm(id);
@@ -441,8 +446,52 @@ export function FormBuilderPage({ formId: id }: FormBuilderPageProps) {
 
   async function copyShareLink() {
     if (!ownerForm?.slug) return;
-    await navigator.clipboard.writeText(`${window.location.origin}/f/${ownerForm.slug}`);
+    await navigator.clipboard.writeText(getPublicShareUrl(ownerForm.slug));
     toast.success("Share link copied");
+  }
+
+  function getPublicShareUrl(slug: string): string {
+    return `${window.location.origin}/f/${slug}`;
+  }
+
+  async function openQrDialog() {
+    if (!ownerForm?.slug || ownerForm.status !== "published") return;
+
+    const shareUrl = getPublicShareUrl(ownerForm.slug);
+    setQrOpen(true);
+    setQrShareUrl(shareUrl);
+    setQrDataUrl(null);
+    setQrError(null);
+    setQrIsLoading(true);
+
+    try {
+      const QRCode = await import("qrcode");
+      const dataUrl = await QRCode.toDataURL(shareUrl, {
+        errorCorrectionLevel: "M",
+        margin: 2,
+        scale: 8,
+        color: {
+          dark: "#111827",
+          light: "#ffffff",
+        },
+      });
+      setQrDataUrl(dataUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate QR code";
+      setQrError(message);
+      toast.error(message);
+    } finally {
+      setQrIsLoading(false);
+    }
+  }
+
+  function downloadQrCode() {
+    if (!qrDataUrl || !ownerForm?.slug) return;
+
+    const link = document.createElement("a");
+    link.href = qrDataUrl;
+    link.download = `newform-${ownerForm.slug}-qr.png`;
+    link.click();
   }
 
   const lifecycleIsPending =
@@ -741,6 +790,12 @@ export function FormBuilderPage({ formId: id }: FormBuilderPageProps) {
                             Copy link
                           </Button>
                         ) : null}
+                        {ownerForm.status === "published" ? (
+                          <Button type="button" variant="outline" onClick={openQrDialog}>
+                            <QrCodeIcon />
+                            QR code
+                          </Button>
+                        ) : null}
                         <Button asChild type="button" variant="ghost">
                           <Link href={`/f/${ownerForm.slug}`} target="_blank">
                             <ExternalLinkIcon />
@@ -919,7 +974,86 @@ export function FormBuilderPage({ formId: id }: FormBuilderPageProps) {
           fields={fields}
         />
       ) : null}
+
+      <QrCodeDialog
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+        shareUrl={qrShareUrl}
+        dataUrl={qrDataUrl}
+        error={qrError}
+        isLoading={qrIsLoading}
+        onDownload={downloadQrCode}
+        onCopy={copyShareLink}
+      />
     </DashboardShell>
+  );
+}
+
+function QrCodeDialog({
+  open,
+  onOpenChange,
+  shareUrl,
+  dataUrl,
+  error,
+  isLoading,
+  onDownload,
+  onCopy,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  shareUrl: string | null;
+  dataUrl: string | null;
+  error: string | null;
+  isLoading: boolean;
+  onDownload: () => void;
+  onCopy: () => Promise<void>;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Share with QR code</DialogTitle>
+          <DialogDescription>Download or scan this code to open the public form.</DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Spinner />
+            Generating QR code...
+          </div>
+        ) : error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : dataUrl ? (
+          <div className="flex flex-col gap-4">
+            <div className="mx-auto rounded-xl border bg-white p-4 shadow-sm">
+              <img src={dataUrl} alt="QR code for public form" className="h-56 w-56" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="qr-share-url">Public URL</Label>
+              <div className="flex gap-2">
+                <Input id="qr-share-url" value={shareUrl ?? ""} readOnly />
+                <Button type="button" variant="outline" onClick={onCopy}>
+                  <CopyIcon />
+                  Copy
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          <Button type="button" disabled={!dataUrl} onClick={onDownload}>
+            <DownloadIcon />
+            Download PNG
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
