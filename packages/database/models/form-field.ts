@@ -4,6 +4,7 @@ import {
   varchar,
   timestamp,
   boolean,
+  integer,
   json,
   text,
   numeric,
@@ -27,6 +28,12 @@ export type FormFieldValidation = {
   dateMax?: string;
 };
 
+export type FormFieldVisibilityCondition = {
+  sourceFieldId: string;
+  operator: "equals" | "not_equals";
+  value: string;
+};
+
 export const formFieldsTable = pgTable(
   "form_fields",
   {
@@ -38,10 +45,12 @@ export const formFieldsTable = pgTable(
     isRequired: boolean("is_required").default(false),
 
     index: numeric("index", { scale: 2 }).notNull(),
+    pageIndex: integer("page_index").notNull().default(0),
 
     type: varchar("type", { length: 30 }).notNull(),
     options: json("options").$type<FormFieldOption[] | null>(),
     validation: json("validation").$type<FormFieldValidation | null>(),
+    visibilityCondition: json("visibility_condition").$type<FormFieldVisibilityCondition | null>(),
 
     formId: uuid("form_id").references(() => formsTable.id),
 
@@ -50,7 +59,7 @@ export const formFieldsTable = pgTable(
   },
   (table) => {
     return {
-      uniqueFormIdAndIndex: unique().on(table.formId, table.index),
+      uniqueFormIdPageIndexAndIndex: unique().on(table.formId, table.pageIndex, table.index),
     };
   },
 );

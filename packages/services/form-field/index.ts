@@ -10,6 +10,7 @@ import {
   type FormFieldOptionSchemaType,
   type FormFieldTypeSchemaType,
   type FormFieldValidationSchemaType,
+  type FormFieldVisibilityConditionSchemaType,
   type GetFieldsInputSchemaType,
   type UpdateFieldInputSchemaType,
   updateFieldInputSchema,
@@ -26,6 +27,12 @@ const optionFieldTypes = new Set<FormFieldTypeSchemaType>([
   "SINGLE_SELECT",
   "MULTI_SELECT",
   "CHECKBOX",
+]);
+
+const conditionSourceFieldTypes = new Set<FormFieldTypeSchemaType>([
+  "SINGLE_SELECT",
+  "CHECKBOX",
+  "RATING",
 ]);
 
 const normalizeOptions = (
@@ -74,6 +81,56 @@ const validateFieldConfig = (
   }
 };
 
+async function validateVisibilityCondition(
+  formId: string,
+  fieldId: string | null,
+  condition: FormFieldVisibilityConditionSchemaType | null | undefined,
+) {
+  if (!condition) return;
+  if (fieldId === condition.sourceFieldId) throw new Error("A field cannot depend on itself");
+
+  const sourceRows = await db
+    .select({
+      id: formFieldsTable.id,
+      type: formFieldsTable.type,
+      options: formFieldsTable.options,
+      validation: formFieldsTable.validation,
+    })
+    .from(formFieldsTable)
+    .where(and(eq(formFieldsTable.id, condition.sourceFieldId), eq(formFieldsTable.formId, formId)))
+    .limit(1);
+
+  const sourceField = sourceRows[0];
+  if (!sourceField) throw new Error("Condition source field must belong to the same form");
+
+  const sourceType = formFieldTypeSchema.parse(sourceField.type);
+  if (!conditionSourceFieldTypes.has(sourceType))
+    throw new Error("Unsupported condition source field type");
+
+  if (sourceType === "SINGLE_SELECT") {
+    const optionValues = new Set((sourceField.options ?? []).map((option) => option.value));
+    if (!optionValues.has(condition.value))
+      throw new Error("Condition value must match a source option");
+  }
+
+  if (sourceType === "CHECKBOX") {
+    if ((sourceField.options?.length ?? 0) > 0) {
+      throw new Error("Option checkbox fields cannot be condition sources");
+    }
+    if (condition.value !== "true" && condition.value !== "false") {
+      throw new Error("Checkbox condition value must be true or false");
+    }
+  }
+
+  if (sourceType === "RATING") {
+    const rating = Number(condition.value);
+    const ratingMax = sourceField.validation?.ratingMax ?? 5;
+    if (!Number.isInteger(rating) || rating < 1 || rating > ratingMax) {
+      throw new Error("Rating condition value is out of range");
+    }
+  }
+}
+
 class FormFieldService {
   private async assertFormOwner(formId: string, userId: string) {
     const rows = await db
@@ -103,13 +160,26 @@ class FormFieldService {
   }
 
   public async createField(input: CreateFieldInputSchemaType) {
-    const { userId, label, description, placeholder, isRequired, index, type, formId, options, validation } =
-      await createFieldInputSchema.parseAsync(input);
+    const {
+      userId,
+      label,
+      description,
+      placeholder,
+      isRequired,
+      index,
+      pageIndex,
+      type,
+      formId,
+      options,
+      validation,
+      visibilityCondition,
+    } = await createFieldInputSchema.parseAsync(input);
     await this.assertFormOwner(formId, userId);
 
     const normalizedOptions = normalizeOptions(type, options);
     const normalizedValidation = normalizeValidation(validation);
     validateFieldConfig(type, normalizedOptions, normalizedValidation);
+    await validateVisibilityCondition(formId, null, visibilityCondition);
 
     const fieldInsertResult = await db
       .insert(formFieldsTable)
@@ -120,9 +190,11 @@ class FormFieldService {
         placeholder,
         isRequired,
         index,
+        pageIndex: pageIndex ?? 0,
         type,
         options: normalizedOptions,
         validation: normalizedValidation,
+        visibilityCondition: visibilityCondition ?? null,
         formId,
       })
       .returning({
@@ -151,16 +223,18 @@ class FormFieldService {
         placeholder: formFieldsTable.placeholder,
         isRequired: formFieldsTable.isRequired,
         index: formFieldsTable.index,
+        pageIndex: formFieldsTable.pageIndex,
         type: formFieldsTable.type,
         options: formFieldsTable.options,
         validation: formFieldsTable.validation,
+        visibilityCondition: formFieldsTable.visibilityCondition,
         formId: formFieldsTable.formId,
         createdAt: formFieldsTable.createdAt,
         updatedAt: formFieldsTable.updatedAt,
       })
       .from(formFieldsTable)
       .where(eq(formFieldsTable.formId, formId))
-      .orderBy(formFieldsTable.index);
+      .orderBy(formFieldsTable.pageIndex, formFieldsTable.index);
 
     return fields.map((field) => ({ ...field, type: formFieldTypeSchema.parse(field.type) }));
   }
@@ -171,7 +245,11 @@ class FormFieldService {
     await this.assertFormOwner(formId, userId);
 
     const fieldRows = await db
-      .select({ type: formFieldsTable.type, options: formFieldsTable.options, validation: formFieldsTable.validation })
+      .select({
+        type: formFieldsTable.type,
+        options: formFieldsTable.options,
+        validation: formFieldsTable.validation,
+      })
       .from(formFieldsTable)
       .where(eq(formFieldsTable.id, id))
       .limit(1);
@@ -186,6 +264,7 @@ class FormFieldService {
     const normalizedOptions = normalizeOptions(nextType, updates.options ?? currentField.options);
     const normalizedValidation = normalizeValidation(updates.validation ?? currentField.validation);
     validateFieldConfig(nextType, normalizedOptions, normalizedValidation);
+    await validateVisibilityCondition(formId, id, updates.visibilityCondition);
 
     const fieldUpdateResult = await db
       .update(formFieldsTable)

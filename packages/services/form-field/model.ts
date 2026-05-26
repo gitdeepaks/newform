@@ -28,6 +28,12 @@ export const formFieldValidationSchema = z.object({
   dateMax: z.string().optional(),
 });
 
+export const formFieldVisibilityConditionSchema = z.object({
+  sourceFieldId: z.string().uuid(),
+  operator: z.enum(["equals", "not_equals"]),
+  value: z.string().min(1),
+});
+
 export const createFieldInputSchema = z.object({
   userId: z.string().describe("The id of the user creating the field"),
   label: z.string().min(1).max(100).describe("The label of the form field"),
@@ -35,10 +41,12 @@ export const createFieldInputSchema = z.object({
   placeholder: z.string().optional().describe("The placeholder of the form field"),
   isRequired: z.boolean().optional().describe("Whether the form field is required"),
   index: z.string().describe("The fractional index used to sort the form field"),
+  pageIndex: z.number().int().min(0).optional(),
   type: formFieldTypeSchema.describe("The type of the form field"),
   formId: z.string().describe("The id of the form this field belongs to"),
   options: z.array(formFieldOptionSchema).nullable().optional(),
   validation: formFieldValidationSchema.nullable().optional(),
+  visibilityCondition: formFieldVisibilityConditionSchema.nullable().optional(),
 });
 
 export const updateFieldInputSchema = z.object({
@@ -49,9 +57,11 @@ export const updateFieldInputSchema = z.object({
   placeholder: z.string().optional().nullable().describe("The placeholder of the form field"),
   isRequired: z.boolean().optional().describe("Whether the form field is required"),
   index: z.string().optional().describe("The fractional index used to sort the form field"),
+  pageIndex: z.number().int().min(0).optional(),
   type: formFieldTypeSchema.optional().describe("The type of the form field"),
   options: z.array(formFieldOptionSchema).nullable().optional(),
   validation: formFieldValidationSchema.nullable().optional(),
+  visibilityCondition: formFieldVisibilityConditionSchema.nullable().optional(),
 });
 
 export const deleteFieldInputSchema = z.object({
@@ -71,3 +81,6 @@ export type GetFieldsInputSchemaType = z.infer<typeof getFieldsInputSchema>;
 export type FormFieldTypeSchemaType = z.infer<typeof formFieldTypeSchema>;
 export type FormFieldOptionSchemaType = z.infer<typeof formFieldOptionSchema>;
 export type FormFieldValidationSchemaType = z.infer<typeof formFieldValidationSchema>;
+export type FormFieldVisibilityConditionSchemaType = z.infer<
+  typeof formFieldVisibilityConditionSchema
+>;

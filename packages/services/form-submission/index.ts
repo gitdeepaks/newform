@@ -8,6 +8,7 @@ import {
   usersTable,
   type FormFieldOption,
   type FormFieldValidation,
+  type FormFieldVisibilityCondition,
   type FormSubmissionMetadata,
   type FormSubmissionValueRow,
 } from "@repo/database/schema";
@@ -38,6 +39,7 @@ type PublicField = {
   isRequired: boolean | null;
   options: FormFieldOption[] | null;
   validation: FormFieldValidation | null;
+  visibilityCondition: FormFieldVisibilityCondition | null;
 };
 
 type ResponseField = {
@@ -93,11 +95,15 @@ function formatResponseValueForCsv(field: ResponseField, value: string | undefin
 
   if (field.type === "SINGLE_SELECT") return getOptionLabel(field, value);
   if (field.type === "MULTI_SELECT") {
-    return parseStringArray(value).map((item) => getOptionLabel(field, item)).join(", ");
+    return parseStringArray(value)
+      .map((item) => getOptionLabel(field, item))
+      .join(", ");
   }
   if (field.type === "CHECKBOX") {
     if ((field.options?.length ?? 0) > 0) {
-      return parseStringArray(value).map((item) => getOptionLabel(field, item)).join(", ");
+      return parseStringArray(value)
+        .map((item) => getOptionLabel(field, item))
+        .join(", ");
     }
     return value === "true" ? "Yes" : "No";
   }
@@ -124,8 +130,10 @@ function validateAnswer(field: PublicField, value: string) {
     if (!value) return;
     const numberValue = Number(value);
     if (!Number.isFinite(numberValue)) throw new Error("Invalid number value");
-    if (validation?.min !== undefined && numberValue < validation.min) throw new Error("Number is too small");
-    if (validation?.max !== undefined && numberValue > validation.max) throw new Error("Number is too large");
+    if (validation?.min !== undefined && numberValue < validation.min)
+      throw new Error("Number is too small");
+    if (validation?.max !== undefined && numberValue > validation.max)
+      throw new Error("Number is too large");
   }
 
   if (field.type === "SHORT_TEXT" || field.type === "LONG_TEXT") {
@@ -177,6 +185,20 @@ function validateAnswer(field: PublicField, value: string) {
     if (validation?.dateMin && value < validation.dateMin) throw new Error("Date is too early");
     if (validation?.dateMax && value > validation.dateMax) throw new Error("Date is too late");
   }
+}
+
+function isFieldVisibleForSubmission(
+  field: PublicField,
+  answerByFieldId: Map<string, string>,
+): boolean {
+  const condition = field.visibilityCondition;
+  if (!condition) return true;
+
+  const sourceValue = answerByFieldId.get(condition.sourceFieldId);
+  if (sourceValue === undefined) return false;
+
+  if (condition.operator === "equals") return sourceValue === condition.value;
+  return sourceValue !== condition.value;
 }
 
 class FormSubmissionService {
@@ -256,7 +278,8 @@ class FormSubmissionService {
     const form = formRows[0];
     if (!form) throw new Error("Form not found");
     if (form.status !== "published") throw new Error("This form is not accepting responses");
-    if (form.expiresAt && form.expiresAt.getTime() < Date.now()) throw new Error("This form is closed");
+    if (form.expiresAt && form.expiresAt.getTime() < Date.now())
+      throw new Error("This form is closed");
 
     if (form.responseLimit !== null) {
       const submissionCount = await db
@@ -276,20 +299,30 @@ class FormSubmissionService {
         isRequired: formFieldsTable.isRequired,
         options: formFieldsTable.options,
         validation: formFieldsTable.validation,
+        visibilityCondition: formFieldsTable.visibilityCondition,
       })
       .from(formFieldsTable)
       .where(eq(formFieldsTable.formId, form.id));
 
     const fieldById = new Map(fields.map((field) => [field.id, field]));
     const answerByFieldId = new Map(values.map((answer) => [answer.formFieldId, answer.value]));
-
     for (const answer of values) {
+      if (!fieldById.has(answer.formFieldId)) throw new Error("Unknown form field submitted");
+    }
+
+    const visibleFields = fields.filter((field) =>
+      isFieldVisibleForSubmission(field, answerByFieldId),
+    );
+    const visibleFieldIds = new Set(visibleFields.map((field) => field.id));
+    const visibleValues = values.filter((answer) => visibleFieldIds.has(answer.formFieldId));
+
+    for (const answer of visibleValues) {
       const field = fieldById.get(answer.formFieldId);
       if (!field) throw new Error("Unknown form field submitted");
       validateAnswer(field, answer.value);
     }
 
-    for (const field of fields) {
+    for (const field of visibleFields) {
       const answer = answerByFieldId.get(field.id);
       if (field.isRequired && (!answer || answer.trim().length === 0)) {
         throw new Error("Please complete all required fields");
@@ -302,7 +335,7 @@ class FormSubmissionService {
       .insert(formSubmissionsTable)
       .values({
         formId: form.id,
-        values,
+        values: visibleValues,
         respondentEmail: respondentEmail ? answerByFieldId.get(respondentEmail) : undefined,
         metadata: responseMetadata,
       })
@@ -366,7 +399,10 @@ class FormSubmissionService {
         .orderBy(formSubmissionsTable.submittedAt)
         .limit(pageSize)
         .offset(offset),
-      db.select({ value: count() }).from(formSubmissionsTable).where(eq(formSubmissionsTable.formId, formId)),
+      db
+        .select({ value: count() })
+        .from(formSubmissionsTable)
+        .where(eq(formSubmissionsTable.formId, formId)),
     ]);
     const total = totalRows[0]?.value ?? 0;
 
@@ -384,7 +420,10 @@ class FormSubmissionService {
     const [fields, submissions, events] = await Promise.all([
       this.getResponseFields(formId),
       db
-        .select({ values: formSubmissionsTable.values, submittedAt: formSubmissionsTable.submittedAt })
+        .select({
+          values: formSubmissionsTable.values,
+          submittedAt: formSubmissionsTable.submittedAt,
+        })
         .from(formSubmissionsTable)
         .where(eq(formSubmissionsTable.formId, formId)),
       db
@@ -416,7 +455,10 @@ class FormSubmissionService {
         if (field.type === "SINGLE_SELECT") {
           responseCount += 1;
           optionCounts.set(answer, (optionCounts.get(answer) ?? 0) + 1);
-        } else if (field.type === "MULTI_SELECT" || (field.type === "CHECKBOX" && (field.options?.length ?? 0) > 0)) {
+        } else if (
+          field.type === "MULTI_SELECT" ||
+          (field.type === "CHECKBOX" && (field.options?.length ?? 0) > 0)
+        ) {
           const values = parseStringArray(answer);
           if (values.length > 0) responseCount += 1;
           for (const value of values) optionCounts.set(value, (optionCounts.get(value) ?? 0) + 1);
@@ -442,7 +484,12 @@ class FormSubmissionService {
         responseCount,
         options: optionCounts.size
           ? Array.from(optionCounts.entries()).map(([value, valueCount]) => ({
-              label: field.type === "CHECKBOX" && (field.options?.length ?? 0) === 0 ? (value === "true" ? "Yes" : "No") : getOptionLabel(field, value),
+              label:
+                field.type === "CHECKBOX" && (field.options?.length ?? 0) === 0
+                  ? value === "true"
+                    ? "Yes"
+                    : "No"
+                  : getOptionLabel(field, value),
               value,
               count: valueCount,
             }))
@@ -455,8 +502,12 @@ class FormSubmissionService {
       totalResponses,
       totalSubmissions,
       totalViews,
-      completionRate: totalViews > 0 ? (totalSubmissions / totalViews) * 100 : totalResponses > 0 ? 100 : 0,
-      submissionsByDay: Array.from(submissionsByDayMap.entries()).map(([date, valueCount]) => ({ date, count: valueCount })),
+      completionRate:
+        totalViews > 0 ? (totalSubmissions / totalViews) * 100 : totalResponses > 0 ? 100 : 0,
+      submissionsByDay: Array.from(submissionsByDayMap.entries()).map(([date, valueCount]) => ({
+        date,
+        count: valueCount,
+      })),
       fieldBreakdown,
     };
   }
@@ -481,10 +532,18 @@ class FormSubmissionService {
     const rows = responses.map((response) => [
       response.submittedAt?.toISOString() ?? "",
       response.respondentEmail ?? "",
-      ...fields.map((field) => formatResponseValueForCsv(field, getAnswerValue(response.values, field.id))),
+      ...fields.map((field) =>
+        formatResponseValueForCsv(field, getAnswerValue(response.values, field.id)),
+      ),
     ]);
     const csv = [header, ...rows].map((row) => row.map(escapeCsvValue).join(",")).join("\n");
-    const filename = `${form.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "form"}-responses.csv`;
+    const filename = `${
+      form.title
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "form"
+    }-responses.csv`;
 
     return { filename, csv };
   }

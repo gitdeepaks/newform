@@ -1,5 +1,10 @@
 import { and, count, db, eq, ne } from "@repo/database";
-import { formFieldsTable, formsTable, formSubmissionsTable, themesTable } from "@repo/database/schema";
+import {
+  formFieldsTable,
+  formsTable,
+  formSubmissionsTable,
+  themesTable,
+} from "@repo/database/schema";
 import type { ThemeTokens } from "@repo/database/schema";
 import { formFieldTypeSchema } from "../form-field/model";
 import {
@@ -145,19 +150,22 @@ class FormService {
 
     const sourceFields = await db
       .select({
+        id: formFieldsTable.id,
         label: formFieldsTable.label,
         description: formFieldsTable.description,
         labelKey: formFieldsTable.labelKey,
         placeholder: formFieldsTable.placeholder,
         isRequired: formFieldsTable.isRequired,
         index: formFieldsTable.index,
+        pageIndex: formFieldsTable.pageIndex,
         type: formFieldsTable.type,
         options: formFieldsTable.options,
         validation: formFieldsTable.validation,
+        visibilityCondition: formFieldsTable.visibilityCondition,
       })
       .from(formFieldsTable)
       .where(eq(formFieldsTable.formId, formId))
-      .orderBy(formFieldsTable.index);
+      .orderBy(formFieldsTable.pageIndex, formFieldsTable.index);
 
     const title = this.cloneTitle(sourceForm.title);
     const slug = await this.ensureUniqueSlug(createSlugFromTitle(title));
@@ -188,20 +196,57 @@ class FormService {
       if (!clonedForm?.id) throw new Error("Failed to clone form");
 
       if (sourceFields.length > 0) {
-        await tx.insert(formFieldsTable).values(
-          sourceFields.map((field) => ({
-            formId: clonedForm.id,
-            label: field.label,
-            description: field.description,
-            labelKey: field.labelKey,
-            placeholder: field.placeholder,
-            isRequired: field.isRequired,
-            index: field.index,
-            type: field.type,
-            options: field.options,
-            validation: field.validation,
-          })),
-        );
+        const clonedFields = await tx
+          .insert(formFieldsTable)
+          .values(
+            sourceFields.map((field) => ({
+              formId: clonedForm.id,
+              label: field.label,
+              description: field.description,
+              labelKey: field.labelKey,
+              placeholder: field.placeholder,
+              isRequired: field.isRequired,
+              index: field.index,
+              pageIndex: field.pageIndex,
+              type: field.type,
+              options: field.options,
+              validation: field.validation,
+              visibilityCondition: null,
+            })),
+          )
+          .returning({ id: formFieldsTable.id });
+
+        const clonedFieldIdBySourceId = new Map<string, string>();
+        for (const [index, sourceField] of sourceFields.entries()) {
+          const clonedField = clonedFields[index];
+          if (!clonedField) throw new Error("Failed to clone form fields");
+          clonedFieldIdBySourceId.set(sourceField.id, clonedField.id);
+        }
+
+        const clonedFieldsWithConditions = sourceFields.flatMap((field) => {
+          if (!field.visibilityCondition) return [];
+          const clonedFieldId = clonedFieldIdBySourceId.get(field.id);
+          const clonedSourceFieldId = clonedFieldIdBySourceId.get(
+            field.visibilityCondition.sourceFieldId,
+          );
+          if (!clonedFieldId || !clonedSourceFieldId) return [];
+          return [
+            {
+              id: clonedFieldId,
+              visibilityCondition: {
+                ...field.visibilityCondition,
+                sourceFieldId: clonedSourceFieldId,
+              },
+            },
+          ];
+        });
+
+        for (const field of clonedFieldsWithConditions) {
+          await tx
+            .update(formFieldsTable)
+            .set({ visibilityCondition: field.visibilityCondition })
+            .where(eq(formFieldsTable.id, field.id));
+        }
       }
 
       return clonedForm;
@@ -261,9 +306,11 @@ class FormService {
           placeholder: formFieldsTable.placeholder,
           isRequired: formFieldsTable.isRequired,
           index: formFieldsTable.index,
+          pageIndex: formFieldsTable.pageIndex,
           type: formFieldsTable.type,
           options: formFieldsTable.options,
           validation: formFieldsTable.validation,
+          visibilityCondition: formFieldsTable.visibilityCondition,
           formId: formFieldsTable.formId,
           createdAt: formFieldsTable.createdAt,
           updatedAt: formFieldsTable.updatedAt,
@@ -273,7 +320,7 @@ class FormService {
       .leftJoin(themesTable, eq(themesTable.id, formsTable.themeId))
       .leftJoin(formFieldsTable, eq(formFieldsTable.formId, formsTable.id))
       .where(eq(formsTable.id, formId))
-      .orderBy(formFieldsTable.index);
+      .orderBy(formFieldsTable.pageIndex, formFieldsTable.index);
 
     const [firstRow] = rows;
     if (!firstRow) {

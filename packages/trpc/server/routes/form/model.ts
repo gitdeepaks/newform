@@ -228,6 +228,12 @@ export const formFieldValidationSchema = z.object({
   dateMax: z.string().optional().describe("Maximum date"),
 });
 
+export const formFieldVisibilityConditionOutputSchema = z.object({
+  sourceFieldId: z.string(),
+  operator: z.enum(["equals", "not_equals"]),
+  value: z.string(),
+});
+
 export const formFieldSchema = z.object({
   id: z.string().describe("The id of the form field"),
   label: z.string().describe("The label of the form field"),
@@ -236,9 +242,11 @@ export const formFieldSchema = z.object({
   placeholder: z.string().nullable().describe("The placeholder of the form field"),
   isRequired: z.boolean().nullable().describe("Whether the form field is required"),
   index: z.string().describe("The fractional index used to sort the form field"),
+  pageIndex: z.number().describe("The page index this field belongs to"),
   type: formFieldTypeSchema.describe("The type of the form field"),
   options: z.array(formFieldOptionSchema).nullable().describe("Options for option-based fields"),
   validation: formFieldValidationSchema.nullable().describe("Validation rules for the field"),
+  visibilityCondition: formFieldVisibilityConditionOutputSchema.nullable(),
   formId: z.string().nullable().describe("The id of the form this field belongs to"),
   createdAt: z.date().nullable().describe("The date the form field was created"),
   updatedAt: z.date().nullable().describe("The date the form field was last updated"),
@@ -327,6 +335,7 @@ export const createFieldInputSchema = z.object({
   placeholder: z.string().optional().describe("The placeholder of the form field"),
   isRequired: z.boolean().optional().describe("Whether the form field is required").default(false),
   index: z.string().describe("The fractional index used to sort the form field"),
+  pageIndex: z.number().int().min(0).optional(),
   type: formFieldTypeSchema.describe("The type of the form field"),
   formId: z.string().describe("The id of the form this field belongs to"),
   options: z
@@ -338,6 +347,7 @@ export const createFieldInputSchema = z.object({
     .nullable()
     .optional()
     .describe("Validation rules for the field"),
+  visibilityCondition: formFieldVisibilityConditionOutputSchema.nullable().optional(),
 });
 
 export const createFieldOutputSchema = z.object({
@@ -357,6 +367,7 @@ export const updateFieldInputSchema = z.object({
   placeholder: z.string().optional().nullable().describe("The placeholder of the form field"),
   isRequired: z.boolean().optional().describe("Whether the form field is required"),
   index: z.string().optional().describe("The fractional index used to sort the form field"),
+  pageIndex: z.number().int().min(0).optional(),
   type: formFieldTypeSchema.optional().describe("The type of the form field"),
   options: z
     .array(formFieldOptionSchema)
@@ -367,6 +378,7 @@ export const updateFieldInputSchema = z.object({
     .nullable()
     .optional()
     .describe("Validation rules for the field"),
+  visibilityCondition: formFieldVisibilityConditionOutputSchema.nullable().optional(),
 });
 
 export const updateFieldOutputSchema = z.object({
