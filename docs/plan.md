@@ -42,7 +42,7 @@ Implemented or partially implemented:
 Important gaps:
 
 - README polish, deployment, and final Scalar docs verification remain.
-- Optional bonus features remain after final verification. QR code sharing is completed as a UI-only builder feature using existing public slug URLs. Admin panel foundation is completed.
+- Optional bonus features remain after final verification. QR code sharing, multi-page forms, conditional logic, clone form, expiry/response limits, and admin panel hardening are completed.
 
 ## Sprint Strategy
 
@@ -660,9 +660,9 @@ Acceptance:
 4. Form expiry/response limit UI - Completed. Backend fields and submission checks already existed; builder settings and public closed states were added.
 5. Clone form - Completed. Creators can duplicate owned forms into new draft forms with fields/theme copied and responses excluded.
 6. Password-protected forms.
-7. Conditional logic.
-8. Multi-page form experience.
-9. Admin dashboard.
+7. Conditional logic - Completed.
+8. Multi-page form experience - Completed.
+9. Admin dashboard - Completed and hardened.
 
 Completed files for form preview:
 
@@ -708,6 +708,77 @@ Verification completed for clone form:
 
 - [x] `pnpm check-types` passed.
 - [x] `pnpm build` passed.
+
+## Bonus: Multi-Page Forms And Conditional Logic - Completed
+
+Implemented multi-page forms and V1 conditional visibility:
+
+- [x] Added `form_fields.page_index`.
+- [x] Added `form_fields.visibility_condition`.
+- [x] Updated field ordering to support per-page ordering.
+- [x] Builder supports page tabs and adding fields to selected pages.
+- [x] Builder supports conditional visibility based on single select, boolean checkbox, and rating fields.
+- [x] Public form renders one visible step at a time.
+- [x] Public form skips pages with no visible fields.
+- [x] Hidden required fields do not block public submission.
+- [x] Hidden answers are filtered before persistence.
+- [x] Server-side submission validation respects conditional visibility.
+- [x] Clone form remaps conditional source field IDs to cloned field IDs.
+- [x] Admin form detail includes page and condition metadata.
+
+Completed files include:
+
+- `packages/database/models/form-field.ts`
+- `packages/database/drizzle/20260526174117_absent_polaris/migration.sql`
+- `packages/database/drizzle/20260526174117_absent_polaris/snapshot.json`
+- `packages/services/form-field/model.ts`
+- `packages/services/form-field/index.ts`
+- `packages/services/form-submission/index.ts`
+- `packages/services/form/index.ts`
+- `packages/trpc/server/routes/form/model.ts`
+- `packages/trpc/server/routes/admin/model.ts`
+- `apps/web/custom/components/forms/form-builder-page.tsx`
+- `apps/web/custom/components/forms/builder/*`
+- `apps/web/custom/components/public-form/public-form-page.tsx`
+
+Verification completed:
+
+- [x] `pnpm db:generate` completed from an interactive terminal.
+- [x] `pnpm db:migrate` passed after migration cleanup.
+- [x] `pnpm db:seed` passed.
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
+- [x] `git diff --check` passed.
+
+## Backend Refactor And Hardening - Completed
+
+Implemented backend hardening without changing product behavior:
+
+- [x] Public submission persistence is transactional.
+- [x] Submission row, response event, and email events commit or roll back together.
+- [x] Response limit check now runs inside the submission transaction after locking the form row.
+- [x] Form status and expiry are rechecked inside the submission transaction.
+- [x] Form submission helper logic was split into focused modules for validation, visibility, CSV, and rate limiting.
+- [x] Admin tRPC router was reformatted into readable multi-line procedures.
+- [x] User service sign-in typo was corrected.
+- [x] No `any`, `as any`, or `as unknown as` introduced.
+
+Completed files include:
+
+- `packages/services/form-submission/index.ts`
+- `packages/services/form-submission/answer-validation.ts`
+- `packages/services/form-submission/conditional-visibility.ts`
+- `packages/services/form-submission/csv.ts`
+- `packages/services/form-submission/rate-limit.ts`
+- `packages/services/user/index.ts`
+- `packages/trpc/server/routes/admin/route.ts`
+- `packages/trpc/server/routes/auth/route.ts`
+
+Verification completed:
+
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
+- [x] `git diff --check` passed.
 
 ## Bonus: Admin Panel - Completed
 
@@ -767,7 +838,7 @@ Pre-submit verification:
 - `pnpm db:generate`
 - `pnpm db:migrate`
 - `pnpm db:seed`
-- `pnpm lint`
+- `pnpm lint` currently has known pre-existing ESLint configuration/warning blockers.
 - `pnpm check-types`
 - `pnpm build`
 

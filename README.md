@@ -1,335 +1,410 @@
-# tRPC Monorepo
+# Newform
 
-This repository is a TypeScript monorepo built with pnpm workspaces and Turborepo. It is intended to be the base structure for building multiple applications that share the same API contract, database layer, services, logging, linting, and TypeScript configuration.
+Newform is a Typeform-style form builder SaaS built with a type-safe TypeScript monorepo. It supports authenticated form creation, public and unlisted form sharing, dynamic field types, multi-page forms, conditional logic, themes, response analytics, CSV export, QR sharing, seeded demo data, and an admin panel.
 
-## Stack
+## Overview
 
-- pnpm workspaces for package management
-- Turborepo for running tasks across apps and packages
-- Next.js for the web application
-- Express for the API application
-- tRPC for end-to-end typed APIs
-- trpc-to-openapi and Scalar for OpenAPI-compatible routes and API docs
-- Drizzle ORM with PostgreSQL for the database layer
-- Zod for schema validation
-- Winston for shared logging
-- ESLint and Prettier for code quality and formatting
+Newform gives creators a complete form publishing workflow:
 
-## Folder Structure
+- Create and manage forms from a protected dashboard.
+- Configure dynamic field types, options, validation, pages, and conditional visibility.
+- Publish forms with public or unlisted visibility.
+- Share forms through stable slug URLs and QR codes.
+- Accept public submissions without requiring respondents to log in.
+- Review responses, analytics, and CSV exports.
+- Moderate users and forms through an admin panel.
+
+The project is designed as a SaaS foundation, not only a hackathon prototype. Core business logic lives in shared service packages, tRPC keeps API contracts end-to-end typed, and Drizzle/Zod keep database and validation boundaries explicit.
+
+## Tech Stack
+
+- **Monorepo:** pnpm workspaces, Turborepo
+- **Web:** Next.js App Router, React, Tailwind CSS, shadcn-style UI components
+- **API:** Express, tRPC, trpc-to-openapi, Scalar API docs
+- **Database:** PostgreSQL, Drizzle ORM, Drizzle Kit migrations
+- **Validation:** Zod
+- **Auth:** Cookie-based JWT auth, email/password, optional Google/GitHub OAuth
+- **Language:** TypeScript
+
+## Repository Structure
 
 ```txt
 .
 ├── apps
-│   ├── api
-│   └── web
+│   ├── api                 # Express API, tRPC HTTP server, OpenAPI, Scalar docs
+│   └── web                 # Next.js frontend application
 ├── packages
-│   ├── database
-│   ├── eslint-config
-│   ├── logger
-│   ├── services
-│   ├── trpc
-│   └── typescript-config
-├── docker-compose.yml
+│   ├── database            # Drizzle database client, schemas, migrations, seed data
+│   ├── eslint-config       # Shared ESLint configs
+│   ├── logger              # Shared logger package
+│   ├── services            # Business/domain logic
+│   ├── trpc                # tRPC routers, procedures, schemas, typed client exports
+│   └── typescript-config   # Shared TypeScript configs
+├── docs                    # Implementation notes and project plans
 ├── package.json
 ├── pnpm-workspace.yaml
-├── setup.sh
 └── turbo.json
 ```
 
-## Apps
+## Applications
 
-### `apps/api`
+### Web App
 
-Express API server for serving the backend.
-
-Main responsibilities:
-
-- Starts the HTTP server
-- Mounts the tRPC router at `/trpc`
-- Mounts OpenAPI-compatible tRPC routes at `/api`
-- Serves generated OpenAPI JSON at `/openapi.json`
-- Serves Scalar API docs at `/docs`
-- Provides basic health/status endpoints
-
-Important files:
-
-- `src/index.ts`: HTTP server entrypoint
-- `src/server.ts`: Express application setup
-- `src/env.ts`: API environment configuration
-
-### `apps/web`
-
-Next.js frontend application.
-
-Main responsibilities:
-
-- Renders the web UI
-- Consumes the typed tRPC API from `@repo/trpc`
-- Provides app-level UI components, hooks, providers, and frontend utilities
-
-Important folders:
-
-- `app`: Next.js App Router routes, layouts, and global styles
-- `components`: React components and UI primitives
-- `hooks`: frontend hooks
-- `lib`: frontend utilities
-- `providers`: React providers
-- `trpc`: frontend tRPC client setup
-
-## Packages
-
-### `packages/trpc`
-
-Shared tRPC package used by both the API server and frontend apps.
-
-Main responsibilities:
-
-- Defines the root `serverRouter`
-- Defines tRPC procedures, routers, context, and schemas
-- Exports typed client helpers for frontend consumers
-- Connects route procedures to the service layer
-
-Important folders:
-
-- `server/routes`: tRPC route modules
-- `server/services`: service exports used by tRPC routes
-- `server/utils`: tRPC server utilities
-- `client`: typed tRPC client exports
-
-### `packages/services`
-
-Business logic layer.
-
-Main responsibilities:
-
-- Keeps business rules out of API route definitions
-- Coordinates database access, external clients, and reusable domain logic
-- Defines service-level schemas and models
-
-Current areas:
-
-- `user`: user and authentication-related service logic
-- `clients`: external service clients, such as Google OAuth
-
-### `packages/database`
-
-Database package using Drizzle ORM and PostgreSQL.
-
-Main responsibilities:
-
-- Creates and exports the Drizzle database client
-- Defines database schemas and models
-- Stores Drizzle migrations
-- Provides database migration and generation scripts
-
-Important folders:
-
-- `models`: Drizzle table definitions
-- `drizzle`: generated migration files and metadata
-
-### `packages/logger`
-
-Shared Winston logger package.
-
-Main responsibilities:
-
-- Provides a shared logger across apps and packages
-- Uses readable console logging in development
-- Uses structured JSON logging outside development
-
-### `packages/eslint-config`
-
-Shared ESLint configuration package.
-
-Main responsibilities:
-
-- Provides reusable lint configs for Node, React, and Next.js projects
-- Keeps linting behavior consistent across the monorepo
-
-### `packages/typescript-config`
-
-Shared TypeScript configuration package.
-
-Main responsibilities:
-
-- Provides base TypeScript configs for Node and Next.js packages
-- Keeps compiler options consistent across the monorepo
-
-## Dependency Flow
+Location:
 
 ```txt
 apps/web
-  -> @repo/trpc
+```
 
+Responsibilities:
+
+- Landing page, pricing page, templates page.
+- Auth pages for login/signup.
+- Protected creator dashboard.
+- Form builder UI.
+- Public form renderer at `/f/[slug]`.
+- Admin panel routes under `/admin`.
+- Typed API access through `@repo/trpc`.
+
+### API App
+
+Location:
+
+```txt
 apps/api
-  -> @repo/trpc
-  -> @repo/logger
-
-@repo/trpc
-  -> @repo/services
-
-@repo/services
-  -> @repo/database
-  -> @repo/logger
-
-@repo/database
-  -> PostgreSQL / Drizzle
 ```
 
-The intended direction is for applications to depend on shared packages, not the other way around.
+Responsibilities:
 
-## Request Flow
+- Starts the Express HTTP server.
+- Mounts tRPC at `/trpc`.
+- Mounts OpenAPI-compatible routes at `/api`.
+- Serves OpenAPI JSON at `/openapi.json`.
+- Serves Scalar documentation at `/docs`.
+- Handles OAuth callback routes when providers are configured.
 
-Standard tRPC request flow:
+## Packages
+
+### `@repo/trpc`
+
+Defines the API contract:
+
+- root router
+- public/protected/admin procedures
+- auth routes
+- form routes
+- admin routes
+- OpenAPI metadata
+- typed client exports
+
+### `@repo/services`
+
+Contains domain logic:
+
+- user authentication and OAuth account linking
+- form lifecycle, public lookup, cloning
+- field creation, validation, conditional visibility config
+- public response submission validation
+- response analytics and CSV export
+- theme assignment
+- admin dashboard, moderation, and audit logging
+
+### `@repo/database`
+
+Contains persistence concerns:
+
+- Drizzle database client
+- table models
+- migrations
+- seed script
+
+## Feature Summary
+
+### Form Builder
+
+- Create, edit, publish, unpublish, and archive forms.
+- Public and unlisted visibility modes.
+- Custom slug URLs.
+- Thank-you title and message.
+- Expiry date and response limit settings.
+- Theme assignment.
+- Preview before publishing.
+- Clone form into a draft copy.
+- QR code sharing for published forms.
+
+### Field Types
+
+Supported field types:
+
+- Short text
+- Long text
+- Email
+- Number
+- Single select
+- Multi select
+- Checkbox
+- Rating
+- Date
+
+Supported configuration:
+
+- Required/optional fields.
+- Options for select, multi-select, and checkbox groups.
+- Text length validation.
+- Number min/max validation.
+- Rating scale validation.
+- Date min/max validation.
+
+### Multi-Page And Conditional Forms
+
+- Fields can be grouped by page.
+- Public respondents move through visible pages step by step.
+- Pages with no visible fields are skipped.
+- Conditional fields can depend on supported source fields.
+- Hidden required fields do not block submission.
+- Hidden answers are not persisted.
+- Server-side validation enforces visibility and required rules.
+
+### Responses And Analytics
+
+- Public submissions without respondent login.
+- Server-side answer validation.
+- Honeypot spam protection.
+- IP + slug rate limiting.
+- Transactional submission persistence.
+- Response events and email event rows.
+- Creator response table.
+- Pagination.
+- CSV export.
+- Analytics cards and field breakdowns.
+
+### Admin Panel
+
+- Admin-only backend procedures.
+- Suspended users blocked from protected procedures.
+- Seeded admin account.
+- User role/status management.
+- Self-demotion and self-suspension protection.
+- Last-admin and last-active-admin protection.
+- Form moderation: force unpublish, archive, restore.
+- Submission metadata list without exposing answer values.
+- Audit logs for admin mutations.
+- Transactional admin mutations and audit logs.
+- Confirmation dialogs for destructive actions.
+- Filters and pagination on admin list pages.
+
+## Demo Credentials
+
+Seeded accounts:
 
 ```txt
-Frontend app
-  -> typed tRPC client
-  -> API server /trpc
-  -> @repo/trpc serverRouter
-  -> route procedure
-  -> @repo/services
-  -> @repo/database
+Admin
+Email: admin@example.com
+Password: password123
+
+Demo creator
+Email: demo@example.com
+Password: password123
 ```
 
-OpenAPI-compatible request flow:
+## Environment Variables
+
+Create a root `.env` file. The workspace scripts load environment variables with `dotenv-cli`.
+
+Required:
 
 ```txt
-HTTP client
-  -> API server /api
-  -> trpc-to-openapi middleware
-  -> @repo/trpc serverRouter
+DATABASE_URL=postgresql://...
+JWT_SECRET=your-secret
+WEB_URL=http://localhost:3000
+API_URL=http://localhost:3001
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-## Workspace Scripts
+Optional OAuth variables:
 
-Run commands from the repository root.
-
-```sh
-pnpm dev
+```txt
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+GOOGLE_OAUTH_REDIRECT_URI=
+GITHUB_OAUTH_CLIENT_ID=
+GITHUB_OAUTH_CLIENT_SECRET=
+GITHUB_OAUTH_REDIRECT_URI=
 ```
 
-Starts all workspace packages that define a `dev` script through Turborepo.
+Production domain recommendation:
 
-```sh
-pnpm build
+```txt
+NEXT_PUBLIC_APP_URL=https://www.newform.in
 ```
 
-Builds apps and packages through Turborepo.
+## Local Development
 
-```sh
-pnpm lint
+Install dependencies:
+
+```bash
+pnpm install
 ```
 
-Runs linting across the workspace.
+Run database migrations:
 
-```sh
-pnpm check-types
-```
-
-Runs TypeScript checks across the workspace.
-
-```sh
-pnpm format
-```
-
-Formats TypeScript, TSX, and Markdown files with Prettier.
-
-```sh
-pnpm db:generate
+```bash
 pnpm db:migrate
 ```
 
-Runs Drizzle database generation and migrations through Turborepo.
+Seed demo data:
 
-## Local Database
-
-The repository includes a PostgreSQL service in `docker-compose.yml`.
-
-```sh
-docker compose up -d
+```bash
+pnpm db:seed
 ```
 
-Default local database settings:
+Start development servers:
 
-- Host port: `5432`
-- User: `postgres`
-- Password: `postgres`
-- Database: `dev`
-
-## Environment Setup
-
-The `setup.sh` script is intended to create a root `.env` file from `.env.example` and link it into app/package folders.
-
-```sh
-./setup.sh
+```bash
+pnpm dev
 ```
 
-Environment files are loaded through `dotenv-cli` in root and package scripts.
-
-## Adding New Apps
-
-Add new applications under `apps/*` so they are automatically included in the pnpm workspace.
-
-Recommended pattern:
+Common local URLs:
 
 ```txt
-apps
-├── api
-├── web
-└── new-app
+Web: http://localhost:3000
+API: http://localhost:3001
+Scalar docs: http://localhost:3001/docs
+OpenAPI JSON: http://localhost:3001/openapi.json
 ```
 
-New apps should depend on shared packages instead of duplicating infrastructure:
+## Database Commands
 
-- Use `@repo/trpc` for API types and clients
-- Use `@repo/services` for shared business logic when needed
-- Use `@repo/database` only when the app needs direct database access
-- Use `@repo/logger` for logging
-- Use `@repo/eslint-config` for linting
-- Use `@repo/typescript-config` for TypeScript configuration
+Generate Drizzle migrations:
 
-For frontend apps, prefer consuming the backend through `@repo/trpc/client` instead of calling internal services directly.
-
-For backend apps, keep route definitions thin and place reusable business logic in `packages/services`.
-
-## Adding New Packages
-
-Add shared packages under `packages/*` when code needs to be reused by multiple apps or packages.
-
-Recommended pattern:
-
-```txt
-packages
-├── database
-├── logger
-├── services
-├── trpc
-└── new-package
+```bash
+pnpm db:generate
 ```
 
-Keep package responsibilities focused. Prefer adding domain logic to `packages/services` before creating a new package unless the new package has a clear standalone purpose.
+Apply migrations:
+
+```bash
+pnpm db:migrate
+```
+
+Seed database:
+
+```bash
+pnpm db:seed
+```
+
+Development note:
+
+- This project is still in development.
+- If local migration history becomes inconsistent, it is acceptable to reset the development database, rerun migrations, and reseed.
+- Do not use development reset workflows against production data.
 
 ## API Documentation
 
-When the API app is running, documentation is available at:
+When the API server is running:
 
 ```txt
-/docs
+Scalar docs: /docs
+OpenAPI JSON: /openapi.json
+tRPC endpoint: /trpc
+OpenAPI-compatible route prefix: /api
 ```
 
-The generated OpenAPI document is available at:
+The Scalar docs are generated from tRPC route metadata through `trpc-to-openapi`.
 
-```txt
-/openapi.json
+## Verification Commands
+
+Type check:`
+
+```bash
+pnpm check-types
 ```
 
-## Notes
+Build:
 
-- The root package is private and is not intended to be published.
-- Workspace dependencies use the `workspace:*` protocol.
-- Keep shared code in `packages/*` and app-specific code in `apps/*`.
-- Keep dependency direction one-way: apps depend on packages, packages should not depend on apps.
+```bash
+pnpm build
+```
 
+Format:
 
-We need to follow this procedure DB -> service -> tRPC Procedure -> hook -> UI
+```bash
+pnpm format
+```
+
+Lint:
+
+```bash
+pnpm lint
+```
+
+Known lint note:
+
+- `pnpm lint` currently has known pre-existing ESLint configuration/warning blockers.
+- `pnpm check-types` and `pnpm build` are the primary verified commands for the current implementation state.
+
+## Manual Demo Checklist
+
+Before final submission or deployment, verify:
+
+- Landing page opens.
+- Pricing page opens.
+- Templates page shows only public published forms.
+- Demo creator can log in.
+- Admin can log in.
+- Creator dashboard shows seeded forms.
+- Creator can create a form.
+- Creator can add fields and validations.
+- Creator can create multi-page form flow.
+- Creator can configure conditional visibility.
+- Creator can preview, publish, unpublish, clone, and share a form.
+- Public `/f/[slug]` form can be submitted without login.
+- Expired/closed forms show a graceful unavailable state.
+- Response limit is enforced.
+- Creator can view responses.
+- Creator can export CSV.
+- Analytics update after submissions.
+- Unlisted forms do not appear in templates but work by direct link.
+- Legacy `/form/[form_id]` does not expose draft/unpublished form fields.
+- Admin can view dashboard, users, forms, submissions, and audit logs.
+- Admin destructive actions require confirmation.
+- Admin cannot demote or suspend themselves.
+
+## Deployment Notes
+
+Recommended deployment split:
+
+- Web: Vercel
+- API: Render, Railway, Fly.io, or similar Node hosting
+- Database: Neon, Supabase, Railway Postgres, or managed PostgreSQL
+
+Required production checks:
+
+- Set production `DATABASE_URL`.
+- Set a strong `JWT_SECRET`.
+- Set `NEXT_PUBLIC_API_URL` to the deployed API URL.
+- Set `NEXT_PUBLIC_APP_URL` to the deployed web URL.
+- Run migrations against production database.
+- Seed only intentional demo/admin data.
+- Verify `/docs` and `/openapi.json` on the deployed API.
+- Verify public form submission from a logged-out browser session.
+
+## Known Limitations
+
+- Real email delivery is not connected; email events are recorded in the database.
+- Payments are not implemented.
+- Password-protected forms are not implemented.
+- Rate limiting is currently in-memory and should be moved to Redis/Upstash before horizontal scaling.
+- Password hashing/JWT session hardening is planned for a future production security pass.
+- Analytics are computed in application code and can be optimized with SQL/materialized aggregates as data grows.
+
+## Development Principles
+
+- Keep app routes thin.
+- Put business rules in `packages/services`.
+- Put API contract and procedure boundaries in `packages/trpc`.
+- Put persistence models and migrations in `packages/database`.
+- Keep frontend custom feature components under `apps/web/custom/components`.
+- Preserve end-to-end type safety with Drizzle, Zod, tRPC, and typed hooks.
+- Avoid unsafe typing patterns such as `any`, `as any`, and `as unknown as`.

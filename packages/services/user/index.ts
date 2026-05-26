@@ -135,7 +135,7 @@ class UserService {
     };
   }
 
-  public async singnInUserWithEmailAndPassword(
+  public async signInUserWithEmailAndPassword(
     payload: SignInUserWithEmailAndPasswordInputSchemaType,
   ) {
     const { email, password } = await signInUserWithEmailAndPasswordInputSchema.parseAsync(payload);

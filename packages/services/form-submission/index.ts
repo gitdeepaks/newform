@@ -1,4 +1,4 @@
-import { and, count, db, eq } from "@repo/database";
+import { and, count, db, eq, sql } from "@repo/database";
 import {
   emailEventsTable,
   formFieldsTable,
@@ -6,13 +6,16 @@ import {
   formSubmissionsTable,
   responseEventsTable,
   usersTable,
-  type FormFieldOption,
-  type FormFieldValidation,
-  type FormFieldVisibilityCondition,
   type FormSubmissionMetadata,
   type FormSubmissionValueRow,
 } from "@repo/database/schema";
-import { z } from "zod";
+import {
+  parseStringArray,
+  validateAnswer,
+  type PublicField,
+} from "./answer-validation";
+import { isFieldVisibleForSubmission } from "./conditional-visibility";
+import { escapeCsvValue, formatResponseValueForCsv, getAnalyticsOptionLabel } from "./csv";
 import {
   createSubmissionInputSchema,
   exportResponsesCsvInputSchema,
@@ -27,179 +30,12 @@ import {
   type ListResponsesInputSchemaType,
   type SubmitPublicResponseInputSchemaType,
 } from "./model";
-
-const submitAttempts = new Map<string, number[]>();
-const rateLimitWindowMs = 10 * 60 * 1000;
-const maxAttempts = 5;
-const stringArraySchema = z.array(z.string());
-
-type PublicField = {
-  id: string;
-  type: string;
-  isRequired: boolean | null;
-  options: FormFieldOption[] | null;
-  validation: FormFieldValidation | null;
-  visibilityCondition: FormFieldVisibilityCondition | null;
-};
-
-type ResponseField = {
-  id: string;
-  label: string;
-  type: string;
-  options: FormFieldOption[] | null;
-  validation: FormFieldValidation | null;
-};
-
-function checkRateLimit(key: string) {
-  const now = Date.now();
-  const attempts = (submitAttempts.get(key) ?? []).filter(
-    (timestamp) => now - timestamp < rateLimitWindowMs,
-  );
-
-  if (attempts.length >= maxAttempts) {
-    submitAttempts.set(key, attempts);
-    throw new Error("Too many submissions. Please try again later.");
-  }
-
-  submitAttempts.set(key, [...attempts, now]);
-}
-
-function parseJsonArray(value: string) {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return stringArraySchema.parse(parsed);
-  } catch {
-    throw new Error("Invalid multi-select value");
-  }
-}
-
-function parseStringArray(value: string) {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return stringArraySchema.parse(parsed);
-  } catch {
-    return [];
-  }
-}
+import { checkRateLimit } from "./rate-limit";
 
 function getAnswerValue(values: FormSubmissionValueRow | null | undefined, fieldId: string) {
   return values?.find((value) => value.formFieldId === fieldId)?.value;
 }
 
-function getOptionLabel(field: ResponseField, value: string) {
-  return field.options?.find((option) => option.value === value)?.label ?? value;
-}
-
-function formatResponseValueForCsv(field: ResponseField, value: string | undefined) {
-  if (!value) return "";
-
-  if (field.type === "SINGLE_SELECT") return getOptionLabel(field, value);
-  if (field.type === "MULTI_SELECT") {
-    return parseStringArray(value)
-      .map((item) => getOptionLabel(field, item))
-      .join(", ");
-  }
-  if (field.type === "CHECKBOX") {
-    if ((field.options?.length ?? 0) > 0) {
-      return parseStringArray(value)
-        .map((item) => getOptionLabel(field, item))
-        .join(", ");
-    }
-    return value === "true" ? "Yes" : "No";
-  }
-
-  return value;
-}
-
-function escapeCsvValue(value: string) {
-  if (!/[",\n]/.test(value)) return value;
-  return `"${value.replaceAll('"', '""')}"`;
-}
-
-function validateAnswer(field: PublicField, value: string) {
-  const validation = field.validation;
-  const options = field.options ?? [];
-  const optionValues = new Set(options.map((option) => option.value));
-  const isRequired = field.isRequired === true;
-
-  if (field.type === "EMAIL" && value && !z.string().email().safeParse(value).success) {
-    throw new Error("Invalid email address");
-  }
-
-  if (field.type === "NUMBER") {
-    if (!value) return;
-    const numberValue = Number(value);
-    if (!Number.isFinite(numberValue)) throw new Error("Invalid number value");
-    if (validation?.min !== undefined && numberValue < validation.min)
-      throw new Error("Number is too small");
-    if (validation?.max !== undefined && numberValue > validation.max)
-      throw new Error("Number is too large");
-  }
-
-  if (field.type === "SHORT_TEXT" || field.type === "LONG_TEXT") {
-    if (validation?.minLength !== undefined && value.length < validation.minLength) {
-      throw new Error("Text is too short");
-    }
-    if (validation?.maxLength !== undefined && value.length > validation.maxLength) {
-      throw new Error("Text is too long");
-    }
-  }
-
-  if (field.type === "SINGLE_SELECT" && value && !optionValues.has(value)) {
-    throw new Error("Invalid option value");
-  }
-
-  if (field.type === "MULTI_SELECT") {
-    const values = value ? parseJsonArray(value) : [];
-    if (isRequired && values.length === 0) throw new Error("Please complete all required fields");
-    if (values.some((selectedValue) => !optionValues.has(selectedValue))) {
-      throw new Error("Invalid option value");
-    }
-  }
-
-  if (field.type === "CHECKBOX") {
-    if (options.length > 0) {
-      const values = value ? parseJsonArray(value) : [];
-      if (isRequired && values.length === 0) throw new Error("Please complete all required fields");
-      if (values.some((selectedValue) => !optionValues.has(selectedValue))) {
-        throw new Error("Invalid checkbox value");
-      }
-    } else if (value !== "true" && value !== "false") {
-      throw new Error("Invalid checkbox value");
-    }
-  }
-
-  if (field.type === "RATING") {
-    if (!value) return;
-    const rating = Number(value);
-    const ratingMax = validation?.ratingMax ?? 5;
-    if (!Number.isFinite(rating) || rating < 1 || rating > ratingMax) {
-      throw new Error("Invalid rating value");
-    }
-  }
-
-  if (field.type === "DATE") {
-    if (!value) return;
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) throw new Error("Invalid date value");
-    if (validation?.dateMin && value < validation.dateMin) throw new Error("Date is too early");
-    if (validation?.dateMax && value > validation.dateMax) throw new Error("Date is too late");
-  }
-}
-
-function isFieldVisibleForSubmission(
-  field: PublicField,
-  answerByFieldId: Map<string, string>,
-): boolean {
-  const condition = field.visibilityCondition;
-  if (!condition) return true;
-
-  const sourceValue = answerByFieldId.get(condition.sourceFieldId);
-  if (sourceValue === undefined) return false;
-
-  if (condition.operator === "equals") return sourceValue === condition.value;
-  return sourceValue !== condition.value;
-}
 
 class FormSubmissionService {
   private async verifyOwner(formId: string, userId: string) {
@@ -281,17 +117,6 @@ class FormSubmissionService {
     if (form.expiresAt && form.expiresAt.getTime() < Date.now())
       throw new Error("This form is closed");
 
-    if (form.responseLimit !== null) {
-      const submissionCount = await db
-        .select({ value: count() })
-        .from(formSubmissionsTable)
-        .where(eq(formSubmissionsTable.formId, form.id));
-
-      if ((submissionCount[0]?.value ?? 0) >= form.responseLimit) {
-        throw new Error("This form has reached its response limit");
-      }
-    }
-
     const fields = await db
       .select({
         id: formFieldsTable.id,
@@ -331,31 +156,85 @@ class FormSubmissionService {
 
     const respondentEmail = fields.find((field) => field.type === "EMAIL")?.id;
     const responseMetadata: FormSubmissionMetadata = { ...metadata, slug };
-    const submissionInsertResult = await db
-      .insert(formSubmissionsTable)
-      .values({
+    const creatorEmail = form.creatorEmail ?? undefined;
+    const submittedRespondentEmail = respondentEmail
+      ? answerByFieldId.get(respondentEmail)
+      : undefined;
+
+    const submissionId = await db.transaction(async (tx) => {
+      await tx.execute(sql`select id from forms where id = ${form.id} for update`);
+
+      const [lockedForm] = await tx
+        .select({
+          status: formsTable.status,
+          expiresAt: formsTable.expiresAt,
+          responseLimit: formsTable.responseLimit,
+        })
+        .from(formsTable)
+        .where(eq(formsTable.id, form.id))
+        .limit(1);
+
+      if (!lockedForm) throw new Error("Form not found");
+      if (lockedForm.status !== "published")
+        throw new Error("This form is not accepting responses");
+      if (lockedForm.expiresAt && lockedForm.expiresAt.getTime() < Date.now())
+        throw new Error("This form is closed");
+
+      if (lockedForm.responseLimit !== null) {
+        const submissionCount = await tx
+          .select({ value: count() })
+          .from(formSubmissionsTable)
+          .where(eq(formSubmissionsTable.formId, form.id));
+
+        if ((submissionCount[0]?.value ?? 0) >= lockedForm.responseLimit) {
+          throw new Error("This form has reached its response limit");
+        }
+      }
+
+      const submissionInsertResult = await tx
+        .insert(formSubmissionsTable)
+        .values({
+          formId: form.id,
+          values: visibleValues,
+          respondentEmail: submittedRespondentEmail,
+          metadata: responseMetadata,
+        })
+        .returning({ id: formSubmissionsTable.id });
+
+      const insertedSubmissionId = submissionInsertResult[0]?.id;
+      if (!insertedSubmissionId) throw new Error("Failed to create submission");
+
+      await tx.insert(responseEventsTable).values({
         formId: form.id,
-        values: visibleValues,
-        respondentEmail: respondentEmail ? answerByFieldId.get(respondentEmail) : undefined,
+        submissionId: insertedSubmissionId,
+        type: "submit",
         metadata: responseMetadata,
-      })
-      .returning({ id: formSubmissionsTable.id });
+      });
 
-    const submissionId = submissionInsertResult[0]?.id;
-    if (!submissionId) throw new Error("Failed to create submission");
+      const emailEvents = [
+        creatorEmail
+          ? {
+              formId: form.id,
+              submissionId: insertedSubmissionId,
+              recipient: creatorEmail,
+              type: "creator_notification",
+              status: "queued",
+            }
+          : undefined,
+        submittedRespondentEmail
+          ? {
+              formId: form.id,
+              submissionId: insertedSubmissionId,
+              recipient: submittedRespondentEmail,
+              type: "respondent_confirmation",
+              status: "queued",
+            }
+          : undefined,
+      ].filter((event) => event !== undefined);
 
-    await db.insert(responseEventsTable).values({
-      formId: form.id,
-      submissionId,
-      type: "submit",
-      metadata: responseMetadata,
-    });
+      if (emailEvents.length > 0) await tx.insert(emailEventsTable).values(emailEvents);
 
-    await this.createEmailEvents({
-      formId: form.id,
-      submissionId,
-      creatorEmail: form.creatorEmail ?? undefined,
-      respondentEmail: respondentEmail ? answerByFieldId.get(respondentEmail) : undefined,
+      return insertedSubmissionId;
     });
 
     return { id: submissionId };
@@ -484,12 +363,7 @@ class FormSubmissionService {
         responseCount,
         options: optionCounts.size
           ? Array.from(optionCounts.entries()).map(([value, valueCount]) => ({
-              label:
-                field.type === "CHECKBOX" && (field.options?.length ?? 0) === 0
-                  ? value === "true"
-                    ? "Yes"
-                    : "No"
-                  : getOptionLabel(field, value),
+              label: getAnalyticsOptionLabel(field, value),
               value,
               count: valueCount,
             }))
@@ -548,40 +422,6 @@ class FormSubmissionService {
     return { filename, csv };
   }
 
-  private async createEmailEvents({
-    formId,
-    submissionId,
-    creatorEmail,
-    respondentEmail,
-  }: {
-    formId: string;
-    submissionId: string;
-    creatorEmail?: string;
-    respondentEmail?: string;
-  }) {
-    const events = [
-      creatorEmail
-        ? {
-            formId,
-            submissionId,
-            recipient: creatorEmail,
-            type: "creator_notification",
-            status: "queued",
-          }
-        : undefined,
-      respondentEmail
-        ? {
-            formId,
-            submissionId,
-            recipient: respondentEmail,
-            type: "respondent_confirmation",
-            status: "queued",
-          }
-        : undefined,
-    ].filter((event) => event !== undefined);
-
-    if (events.length > 0) await db.insert(emailEventsTable).values(events);
-  }
 }
 
 export default FormSubmissionService;

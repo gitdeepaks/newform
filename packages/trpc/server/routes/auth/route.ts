@@ -76,7 +76,7 @@ export const authRouter = router({
     .output(signInUserWithEmailAndPasswordOutputSchema)
     .mutation(async ({ input, ctx }) => {
       const { email, password } = input;
-      const { id, token } = await userService.singnInUserWithEmailAndPassword({
+      const { id, token } = await userService.signInUserWithEmailAndPassword({
         email,
         password,
       });
