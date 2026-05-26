@@ -1,185 +1,61 @@
 "use client";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { useForm, useSubmitForm } from "@/hooks/api/form";
-import { use, useState, type FormEvent } from "react";
-import { toast } from "sonner";
+import { usePublicRedirectById } from "@/hooks/api/form";
+import { useRouter } from "next/navigation";
+import { use, useEffect } from "react";
 
-type PublicFormPageProps = {
+type LegacyPublicFormPageProps = {
   params: Promise<{
     form_id: string;
   }>;
 };
 
-type Field = NonNullable<ReturnType<typeof useForm>["form"]>["fields"][number];
-
-const inputTypeMap: Record<Field["type"], string> = {
-  SHORT_TEXT: "text",
-  LONG_TEXT: "text",
-  NUMBER: "number",
-  EMAIL: "email",
-  SINGLE_SELECT: "text",
-  MULTI_SELECT: "text",
-  CHECKBOX: "checkbox",
-  RATING: "number",
-  DATE: "date",
-};
-
-export default function PublicFormPage({ params }: PublicFormPageProps) {
+export default function LegacyPublicFormPage({ params }: LegacyPublicFormPageProps) {
   const { form_id } = use(params);
-  const { form, formError, formIsLoading } = useForm(form_id);
-  const { submitFormAsync, submitFormIsPending } = useSubmitForm();
+  const router = useRouter();
+  const { redirectData, redirectError, redirectIsLoading } = usePublicRedirectById(form_id);
 
-  const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
-  const [isSubmitted, setIsSubmitted] = useState(false);
-
-  function setAnswer(fieldId: string, value: string | boolean) {
-    setAnswers((prev) => ({ ...prev, [fieldId]: value }));
-  }
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!form) return;
-
-    const missing = form.fields.filter((field) => {
-      if (!field.isRequired) return false;
-      const value = answers[field.id];
-      if (field.type === "CHECKBOX") return value !== true;
-      return value === undefined || `${value}`.trim() === "";
-    });
-
-    if (missing.length > 0) {
-      toast.error(`Please complete: ${missing.map((field) => field.label).join(", ")}`);
-      return;
+  useEffect(() => {
+    if (redirectData?.slug) {
+      router.replace(`/f/${redirectData.slug}`);
     }
-
-    try {
-      await submitFormAsync({
-        formId: form.id,
-        values: form.fields
-          .filter((field) => answers[field.id] !== undefined)
-          .map((field) => ({
-            formFieldId: field.id,
-            value: `${answers[field.id]}`,
-          })),
-      });
-      toast.success("Form submitted");
-      setIsSubmitted(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to submit form";
-      toast.error(message);
-    }
-  }
+  }, [redirectData?.slug, router]);
 
   return (
-    <main className="flex min-h-svh justify-center bg-muted/30 px-4 py-10">
-      <div className="w-full max-w-xl">
-        {formIsLoading ? (
-          <div className="flex min-h-60 items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Spinner />
-            Loading form...
-          </div>
-        ) : formError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{formError.message}</AlertDescription>
-          </Alert>
-        ) : isSubmitted ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">Thanks for your response</CardTitle>
-              <CardDescription>Your submission has been recorded.</CardDescription>
-            </CardHeader>
-          </Card>
-        ) : form ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">{form.title}</CardTitle>
-              {form.description ? <CardDescription>{form.description}</CardDescription> : null}
-            </CardHeader>
-            <CardContent>
-              {form.fields.length === 0 ? (
-                <p className="text-sm text-muted-foreground">This form has no fields yet.</p>
-              ) : (
-                <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
-                  {form.fields.map((field) =>
-                    field.type === "CHECKBOX" ? (
-                      <div
-                        key={field.id}
-                        className="flex flex-row items-center justify-between rounded-lg border p-3"
-                      >
-                        <div>
-                          <Label htmlFor={field.id}>
-                            {field.label}
-                            {field.isRequired ? <span className="text-destructive"> *</span> : null}
-                          </Label>
-                          {field.description ? (
-                            <p className="text-sm text-muted-foreground">{field.description}</p>
-                          ) : null}
-                        </div>
-                        <Switch
-                          id={field.id}
-                          checked={answers[field.id] === true}
-                          disabled={submitFormIsPending}
-                          onCheckedChange={(checked) => setAnswer(field.id, checked)}
-                        />
-                      </div>
-                    ) : field.type === "LONG_TEXT" ? (
-                      <div key={field.id} className="flex flex-col gap-2">
-                        <Label htmlFor={field.id}>
-                          {field.label}
-                          {field.isRequired ? <span className="text-destructive"> *</span> : null}
-                        </Label>
-                        {field.description ? (
-                          <p className="text-sm text-muted-foreground">{field.description}</p>
-                        ) : null}
-                        <Textarea
-                          id={field.id}
-                          placeholder={field.placeholder ?? undefined}
-                          required={field.isRequired ?? false}
-                          disabled={submitFormIsPending}
-                          value={(answers[field.id] as string) ?? ""}
-                          onChange={(event) => setAnswer(field.id, event.target.value)}
-                        />
-                      </div>
-                    ) : (
-                      <div key={field.id} className="flex flex-col gap-2">
-                        <Label htmlFor={field.id}>
-                          {field.label}
-                          {field.isRequired ? <span className="text-destructive"> *</span> : null}
-                        </Label>
-                        {field.description ? (
-                          <p className="text-sm text-muted-foreground">{field.description}</p>
-                        ) : null}
-                        <Input
-                          id={field.id}
-                          type={inputTypeMap[field.type]}
-                          placeholder={field.placeholder ?? undefined}
-                          required={field.isRequired ?? false}
-                          disabled={submitFormIsPending}
-                          value={(answers[field.id] as string) ?? ""}
-                          onChange={(event) => setAnswer(field.id, event.target.value)}
-                        />
-                      </div>
-                    ),
-                  )}
-
-                  <Button type="submit" className="w-full" disabled={submitFormIsPending}>
-                    {submitFormIsPending ? <Spinner /> : null}
-                    Submit
-                  </Button>
-                </form>
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+    <main className="flex min-h-svh items-center justify-center bg-muted/30 px-4 py-10">
+      <Card className="w-full max-w-lg">
+        <CardHeader>
+          <CardTitle>Legacy form link</CardTitle>
+          <CardDescription>This older link format is being safely redirected.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {redirectIsLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner />
+              Checking legacy link...
+            </div>
+          ) : redirectError ? (
+            <>
+              <Alert variant="destructive">
+                <AlertTitle>This legacy form link is unavailable.</AlertTitle>
+                <AlertDescription>Please use the current public share link.</AlertDescription>
+              </Alert>
+              <Button type="button" onClick={() => router.push("/templates")}>
+                Browse templates
+              </Button>
+            </>
+          ) : redirectData?.slug ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner />
+              Redirecting to the public form...
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
     </main>
   );
 }

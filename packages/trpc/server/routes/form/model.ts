@@ -71,12 +71,7 @@ export const submissionValueSchema = z.object({
   value: z.string().describe("The submitted value for the form field"),
 });
 
-export const submitFormInputSchema = z.object({
-  formId: z.string().describe("The id of the form being submitted"),
-  values: z.array(submissionValueSchema).describe("The submitted answers for the form fields"),
-});
-
-export const submitFormOutputSchema = z.object({
+export const submitPublicResponseOutputSchema = z.object({
   id: z.string().describe("The id of the created submission"),
 });
 
@@ -85,8 +80,6 @@ export const submitPublicResponseInputSchema = z.object({
   values: z.array(submissionValueSchema).describe("The submitted answers for the form fields"),
   honeypot: z.string().optional().describe("Hidden spam protection field"),
 });
-
-export const submitPublicResponseOutputSchema = submitFormOutputSchema;
 
 export const getSubmissionsInputSchema = z.object({
   formId: z.string().describe("The id of the form whose submissions to fetch"),
@@ -108,7 +101,13 @@ export const getSubmissionsOutputSchema = z.array(
 export const listResponsesInputSchema = z.object({
   formId: z.string().describe("The id of the form whose responses to fetch"),
   page: z.number().int().min(1).default(1).describe("The response page number"),
-  pageSize: z.number().int().min(1).max(100).default(20).describe("The number of responses per page"),
+  pageSize: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(20)
+    .describe("The number of responses per page"),
 });
 
 const responseMetadataSchema = z
@@ -125,7 +124,9 @@ export const listResponsesOutputSchema = z.object({
       id: z.string(),
       label: z.string(),
       type: z.string(),
-      options: z.array(z.object({ id: z.string(), label: z.string(), value: z.string() })).nullable(),
+      options: z
+        .array(z.object({ id: z.string(), label: z.string(), value: z.string() }))
+        .nullable(),
       validation: z
         .object({
           minLength: z.number().int().nonnegative().optional(),
@@ -173,7 +174,9 @@ export const getFormAnalyticsOutputSchema = z.object({
       label: z.string(),
       type: z.string(),
       responseCount: z.number(),
-      options: z.array(z.object({ label: z.string(), value: z.string(), count: z.number() })).optional(),
+      options: z
+        .array(z.object({ label: z.string(), value: z.string(), count: z.number() }))
+        .optional(),
       averageRating: z.number().optional(),
     }),
   ),
@@ -272,6 +275,14 @@ export const getPublicFormBySlugInputSchema = z.object({
   slug: slugSchema.describe("The public form slug"),
 });
 
+export const getPublicRedirectByIdInputSchema = z.object({
+  formId: z.string().uuid().describe("The legacy public form id"),
+});
+
+export const getPublicRedirectByIdOutputSchema = z.object({
+  slug: z.string(),
+});
+
 export const getFormOutputSchema = z.object({
   id: z.string().describe("The id of the form"),
   title: z.string().describe("The title of the form"),
@@ -309,8 +320,15 @@ export const createFieldInputSchema = z.object({
   index: z.string().describe("The fractional index used to sort the form field"),
   type: formFieldTypeSchema.describe("The type of the form field"),
   formId: z.string().describe("The id of the form this field belongs to"),
-  options: z.array(formFieldOptionSchema).nullable().optional().describe("Options for option-based fields"),
-  validation: formFieldValidationSchema.nullable().optional().describe("Validation rules for the field"),
+  options: z
+    .array(formFieldOptionSchema)
+    .nullable()
+    .optional()
+    .describe("Options for option-based fields"),
+  validation: formFieldValidationSchema
+    .nullable()
+    .optional()
+    .describe("Validation rules for the field"),
 });
 
 export const createFieldOutputSchema = z.object({
@@ -331,8 +349,15 @@ export const updateFieldInputSchema = z.object({
   isRequired: z.boolean().optional().describe("Whether the form field is required"),
   index: z.string().optional().describe("The fractional index used to sort the form field"),
   type: formFieldTypeSchema.optional().describe("The type of the form field"),
-  options: z.array(formFieldOptionSchema).nullable().optional().describe("Options for option-based fields"),
-  validation: formFieldValidationSchema.nullable().optional().describe("Validation rules for the field"),
+  options: z
+    .array(formFieldOptionSchema)
+    .nullable()
+    .optional()
+    .describe("Options for option-based fields"),
+  validation: formFieldValidationSchema
+    .nullable()
+    .optional()
+    .describe("Validation rules for the field"),
 });
 
 export const updateFieldOutputSchema = z.object({

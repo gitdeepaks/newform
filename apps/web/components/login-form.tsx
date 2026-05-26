@@ -15,9 +15,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { useOAuthSignin, useSignin } from "@/hooks/api/auth";
+import { useOAuthProviders, useOAuthSignin, useSignin } from "@/hooks/api/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { Github } from "lucide-react";
+import { FcGoogle } from "react-icons/fc";
 
 type LoginFormValues = {
   email: string;
@@ -33,11 +35,17 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     signInUserWithEmailAndPasswordIsPending,
   } = useSignin();
   const { startOAuth } = useOAuthSignin();
+  const { providers, providersIsLoading } = useOAuthProviders();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const googleIsAvailable = providers.includes("google");
+  const githubIsAvailable = providers.includes("github");
 
   useEffect(() => {
-    if (searchParams.get("error")) {
+    const error = searchParams.get("error");
+    if (error === "oauth_not_configured") {
+      toast.error("This social sign-in provider is not configured.");
+    } else if (error) {
       toast.error("Social sign-in failed. Please try again.");
     }
   }, [searchParams]);
@@ -80,30 +88,39 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         </p>
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="lg"
-        onClick={() => startOAuth("google")}
-        className="h-10 w-full justify-center gap-2 border-input bg-background font-normal shadow-none hover:bg-accent/60"
-      >
-        Login with Google
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="lg"
-        onClick={() => startOAuth("github")}
-        className="h-10 w-full justify-center gap-2 border-input bg-background font-normal shadow-none hover:bg-accent/60"
-      >
-        Login with GitHub
-      </Button>
+      <div className="flex flex-col gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          disabled={providersIsLoading || !googleIsAvailable}
+          onClick={() => startOAuth("google")}
+          className="h-10 w-full justify-center gap-2 border-input bg-background font-normal shadow-none hover:bg-accent/60"
+        >
+          <FcGoogle size={18} className="shrink-0" />
+          {providersIsLoading ? "Checking Google..." : "Login with Google"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          disabled={providersIsLoading || !githubIsAvailable}
+          onClick={() => startOAuth("github")}
+          className="h-10 w-full justify-center gap-2 border-input bg-background font-normal shadow-none hover:bg-accent/60"
+        >
+          <Github size={18} className="shrink-0" />
+          {providersIsLoading ? "Checking GitHub..." : "Login with GitHub"}
+        </Button>
+        {!providersIsLoading && !googleIsAvailable && !githubIsAvailable ? (
+          <p className="text-center text-xs text-muted-foreground">
+            Social login is not configured in this environment. Use email and password.
+          </p>
+        ) : null}
+      </div>
 
       <div className="relative flex items-center gap-3">
         <Separator className="flex-1" />
-        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          or
-        </span>
+        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">or</span>
         <Separator className="flex-1" />
       </div>
 

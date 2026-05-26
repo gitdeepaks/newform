@@ -22,16 +22,30 @@ const githubEmailSchema = z.object({
   visibility: z.string().nullable(),
 });
 
+function getGitHubOAuthConfig() {
+  const clientId = env.GITHUB_OAUTH_CLIENT_ID;
+  const clientSecret = env.GITHUB_OAUTH_CLIENT_SECRET;
+  const redirectUri = env.GITHUB_OAUTH_REDIRECT_URI;
+
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new Error("GitHub OAuth is not configured");
+  }
+
+  return { clientId, clientSecret, redirectUri };
+}
+
 export function getGitHubAuthorizationUrl(state: string) {
+  const { clientId, redirectUri } = getGitHubOAuthConfig();
   const url = new URL("https://github.com/login/oauth/authorize");
-  url.searchParams.set("client_id", env.GITHUB_OAUTH_CLIENT_ID);
-  url.searchParams.set("redirect_uri", env.GITHUB_OAUTH_REDIRECT_URI);
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("scope", "read:user user:email");
   url.searchParams.set("state", state);
   return url.toString();
 }
 
 export async function getGitHubOAuthProfile(code: string) {
+  const { clientId, clientSecret, redirectUri } = getGitHubOAuthConfig();
   const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
     headers: {
@@ -39,10 +53,10 @@ export async function getGitHubOAuthProfile(code: string) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      client_id: env.GITHUB_OAUTH_CLIENT_ID,
-      client_secret: env.GITHUB_OAUTH_CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       code,
-      redirect_uri: env.GITHUB_OAUTH_REDIRECT_URI,
+      redirect_uri: redirectUri,
     }),
   });
 

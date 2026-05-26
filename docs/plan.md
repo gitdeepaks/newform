@@ -16,12 +16,17 @@ Implemented or partially implemented:
 - API app already serves tRPC, OpenAPI JSON, and Scalar docs.
 - Auth has signup, login, cookies, and `protectedProcedure`.
 - Dashboard shell exists.
+- Landing page exists at `/`.
+- Pricing page exists at `/pricing`.
+- Templates page exists at `/templates` and consumes public published forms.
+- Themes and seeded demo data exist.
+- Theme switching and sidebar logout exist.
 - Creator can create forms.
 - Creator can list forms.
 - Creator can add/edit/delete basic fields.
-- Public form page exists at `/form/[form_id]`.
+- Legacy public form ID route at `/form/[form_id]` redirects to `/f/[slug]` when the form is published and never renders fields directly.
 - Public slug form page exists at `/f/[slug]`.
-- Public form submission exists by form id.
+- Public form submission uses the secure slug path.
 - Submissions table/service/tRPC/hook/UI exists in a basic form.
 - Form lifecycle is implemented: `draft`/`published`, visibility, slug, publish/unpublish, owner form lookup, public slug lookup, and public forms listing API.
 - Dashboard form list shows status, visibility, and copy share link.
@@ -32,11 +37,12 @@ Implemented or partially implemented:
 - Public slug submission is implemented with server-side validation, honeypot spam protection, IP + slug rate limiting, response event logging, and email event logging.
 - Form submissions now store respondent email, request metadata, and submitted timestamp.
 - Creator response reads now verify form ownership.
+- CSV export for responses is implemented in Priority 4.
 
 Important gaps:
 
-- `listPublicForms` API exists, but public explore/templates UI is still missing.
-- Analytics dashboard, themes, template/explore page, seeded data, landing, pricing, README polish are missing.
+- README polish, deployment, and final Scalar docs verification remain.
+- Optional bonus features remain after final verification.
 
 ## Sprint Strategy
 
@@ -57,7 +63,7 @@ Cut scope if needed:
 - Skip admin dashboard.
 - Skip real payment.
 - Skip real email provider; store/log email events only.
-- Implement QR/password/CSV only after core is stable.
+- Implement QR/password only after core is stable. CSV export is already completed.
 
 ## Priority 0: Stabilize Foundation
 
@@ -162,7 +168,7 @@ Update builder page:
 Add public route:
 
 - [x] Prefer `/f/[slug]` for final share links.
-- [x] Keep `/form/[form_id]` temporarily.
+- [x] Redirect `/form/[form_id]` to the slug route without exposing fields.
 
 Acceptance:
 
@@ -170,7 +176,7 @@ Acceptance:
 - [x] Published unlisted form opens by slug.
 - [x] Draft/unpublished form cannot be opened through public slug lookup.
 - [x] Invalid slug has graceful error state.
-- [ ] Explore/templates UI still needs to consume `listPublicForms` so unlisted forms stay hidden from public listings.
+- [x] Explore/templates UI consumes `listPublicForms` so unlisted forms stay hidden from public listings.
 
 Completed files:
 
@@ -518,7 +524,7 @@ Add:
 
 - Theme selector in builder settings.
 - Apply theme tokens on public form page.
-- `/explore` or `/templates` page showing only `published + public` forms.
+- `/templates` page showing only `published + public` forms.
 
 Seed content:
 
@@ -533,7 +539,7 @@ Seed content:
 Acceptance:
 
 - Seeded demo immediately looks populated.
-- Public forms appear on explore/templates.
+- Public forms appear on templates.
 - Unlisted forms do not appear publicly.
 - Themes are visually visible on public form pages.
 
@@ -565,7 +571,7 @@ Verification results:
 - `pnpm check-types` passed.
 - `pnpm build` passed.
 
-## Priority 6: Landing, Pricing, Docs, README, Deployment
+## Priority 6: Landing, Pricing, Docs, README, Deployment - Partially Completed
 
 Target: hours 40-47.
 
@@ -575,9 +581,25 @@ Flow: UI only unless fetching public forms for templates.
 
 Update:
 
-- `/` landing page with product pitch, CTAs, demo credentials, explore/templates link, docs link.
-- `/pricing` with Free, Pro, Team cards.
-- `/templates` or `/explore` with seeded public forms.
+- [x] `/` landing page with product pitch, CTAs, demo credentials, templates link, docs link.
+- [x] `/pricing` with Free, Pro, Team cards.
+- [x] `/templates` with seeded public forms.
+- [x] Dashboard/sidebar polish, theme switcher, and logout navigation.
+
+Completed files:
+
+- `apps/web/app/page.tsx`
+- `apps/web/app/pricing/page.tsx`
+- `apps/web/app/templates/page.tsx`
+- `apps/web/components/public-header.tsx`
+- `apps/web/components/theme-switcher.tsx`
+- `apps/web/components/app-sidebar.tsx`
+- `apps/web/components/nav-main.tsx`
+- `apps/web/components/nav-user.tsx`
+- `apps/web/components/site-header.tsx`
+- `apps/web/app/dashboard/page.tsx`
+- `apps/web/providers/global.tsx`
+- `apps/web/app/layout.tsx`
 
 ### Scalar Docs
 
@@ -632,7 +654,7 @@ Acceptance:
 
 ## Bonus Priority Only After Core Works
 
-1. CSV export for responses.
+1. CSV export for responses - Completed in Priority 4.
 2. Form preview before publishing.
 3. QR code sharing.
 4. Form expiry/response limit UI if DB already exists.
@@ -652,7 +674,7 @@ Core required:
 - Zod validation for builder and response submission.
 - Field types: text, email, number, select, checkbox, rating, date.
 - Public and unlisted visibility modes.
-- Public forms visible in explore/templates.
+- Public forms visible in templates.
 - Unlisted forms accessible only by direct link.
 - Public submission without login.
 - Response management.
@@ -679,14 +701,21 @@ Pre-submit verification:
 
 Manual demo verification:
 
+- Open `/` and confirm primary links work.
+- Open `/pricing` and confirm links work.
+- Open `/templates` and confirm only public published forms show.
 - Login with `demo@example.com` / `password123`.
 - Open dashboard and see seeded forms.
+- Confirm sidebar logout works.
 - Open a form builder.
 - Publish/unpublish a form.
 - Copy public slug link.
 - Submit public form while logged out.
 - See new response in dashboard.
 - See analytics update.
-- Confirm public form appears in explore.
-- Confirm unlisted form does not appear in explore but works by direct link.
+- Export responses CSV from a form.
+- Confirm public form appears in `/templates`.
+- Confirm unlisted form does not appear in `/templates` but works by direct link.
+- Confirm `/form/[form_id]` does not expose draft/unpublished form fields.
+- Test OAuth only when the provider is configured.
 - Open Scalar docs.

@@ -35,10 +35,10 @@ export default function Page() {
   const activeForms = forms?.filter((form) => form.status !== "archived").length ?? 0;
   const recentForms = forms?.slice(0, 5) ?? [];
   const metrics = [
-    ["Total responses", "--", "--", "Across published forms"],
-    ["Completion rate", "--", "--", "Visitors who finished"],
     ["Active forms", activeForms.toString(), "Live", "Public and unlisted"],
-    ["CSV exports", "--", "--", "Downloaded this month"],
+    ["Analytics", "Per form", "Ready", "Open any form to view response analytics"],
+    ["CSV export", "Available", "Ready", "Open Responses from a form to export CSV"],
+    ["Templates", "3 seeded", "Demo", "Start from public demo templates"],
   ];
 
   return (
@@ -64,7 +64,7 @@ export default function Page() {
                     Form performance at a glance.
                   </h1>
                   <p className="mt-4 max-w-2xl text-muted-foreground">
-                    Track published forms, response volume, completion quality, and exports from one focused workspace.
+                    Manage forms, open per-form analytics, and export response CSVs from one focused workspace.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
@@ -99,7 +99,7 @@ export default function Page() {
                   <CardHeader className="flex flex-col gap-4 border-b sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <CardTitle className="text-2xl font-black tracking-[-0.04em]">Response trend</CardTitle>
-                      <p className="mt-1 text-sm text-muted-foreground">Submissions across the last 12 weeks</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Demo readiness checkpoints, not aggregate analytics</p>
                     </div>
                     <div className="flex rounded-full border bg-background/70 p-1 text-xs font-semibold">
                       <span className="rounded-full bg-primary px-3 py-1.5 text-primary-foreground">12 weeks</span>
@@ -167,9 +167,9 @@ export default function Page() {
                         <tr>
                           <th className="px-5 py-4 font-bold">Form</th>
                           <th className="px-5 py-4 font-bold">Status</th>
-                          <th className="px-5 py-4 font-bold">Responses</th>
-                          <th className="px-5 py-4 font-bold">Completion</th>
-                          <th className="px-5 py-4 font-bold">Updated</th>
+                           <th className="px-5 py-4 font-bold">Visibility</th>
+                           <th className="px-5 py-4 font-bold">Updated</th>
+                           <th className="px-5 py-4 font-bold">Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -201,9 +201,13 @@ export default function Page() {
                                   {form.status}
                                 </Badge>
                               </td>
-                              <td className="px-5 py-4 font-mono font-bold">--</td>
-                              <td className="px-5 py-4 font-mono">--</td>
+                              <td className="px-5 py-4 text-muted-foreground">{form.visibility}</td>
                               <td className="px-5 py-4 text-muted-foreground">{formatRelativeDate(form.updatedAt ?? form.createdAt)}</td>
+                              <td className="px-5 py-4">
+                                <Button asChild variant="outline" size="sm" className="rounded-full bg-background/70">
+                                  <Link href={`/dashboard/forms/${form.id}`}>Open builder</Link>
+                                </Button>
+                              </td>
                             </tr>
                           ))
                         ) : (

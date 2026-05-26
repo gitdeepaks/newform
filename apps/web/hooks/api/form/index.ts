@@ -53,28 +53,6 @@ export const useForms = () => {
   };
 };
 
-export const useForm = (formId: string) => {
-  const {
-    data: form,
-    error: formError,
-    isLoading: formIsLoading,
-    isFetching: formIsFetching,
-    isFetched: formIsFetched,
-    isError: formIsError,
-    status: formStatus,
-  } = trpc.form.getForm.useQuery({ formId });
-
-  return {
-    form,
-    formError,
-    formIsLoading,
-    formIsFetching,
-    formIsFetched,
-    formIsError,
-    formStatus,
-  };
-};
-
 export const useOwnerForm = (formId: string) => {
   const {
     data: form,
@@ -116,6 +94,16 @@ export const usePublicForm = (slug: string) => {
     formIsFetched,
     formIsError,
     formStatus,
+  };
+};
+
+export const usePublicRedirectById = (formId: string) => {
+  const query = trpc.form.getPublicRedirectById.useQuery({ formId });
+
+  return {
+    redirectData: query.data,
+    redirectError: query.error,
+    redirectIsLoading: query.isLoading,
   };
 };
 
@@ -265,30 +253,6 @@ export const useUpdateSlug = () => {
     updateSlug: mutation.mutate,
     updateSlugError: mutation.error,
     updateSlugIsPending: mutation.isPending,
-  };
-};
-
-export const useSubmitForm = () => {
-  const {
-    mutateAsync: submitFormAsync,
-    mutate: submitForm,
-    error: submitFormError,
-    isPending: submitFormIsPending,
-    isSuccess: submitFormIsSuccess,
-    isError: submitFormIsError,
-    isIdle: submitFormIsIdle,
-    status: submitFormStatus,
-  } = trpc.form.submitForm.useMutation();
-
-  return {
-    submitFormAsync,
-    submitForm,
-    submitFormError,
-    submitFormIsPending,
-    submitFormIsSuccess,
-    submitFormIsError,
-    submitFormIsIdle,
-    submitFormStatus,
   };
 };
 

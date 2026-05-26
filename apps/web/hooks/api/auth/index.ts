@@ -14,6 +14,16 @@ export const useOAuthSignin = () => {
   return { startOAuth };
 };
 
+export const useOAuthProviders = () => {
+  const query = trpc.auth.getOAuthProviders.useQuery();
+
+  return {
+    providers: query.data?.providers ?? [],
+    providersIsLoading: query.isLoading,
+    providersError: query.error,
+  };
+};
+
 export const useSignup = () => {
   const utils = trpc.useUtils();
   const {

@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { isGitHubOAuthConfigured, isGoogleOAuthConfigured } from "@repo/services/env";
 import { userService } from "../../services";
 
 import { protectedProcedure, publicProcedure, router } from "../../trpc";
@@ -33,7 +34,12 @@ export const authRouter = router({
     })
     .input(getLoggedInputUserInfoInputModel)
     .output(getOAuthProvidersOutputSchema)
-    .query(() => ({ providers: ["google", "github"] })),
+    .query(() => {
+      const providers: Array<"google" | "github"> = [];
+      if (isGoogleOAuthConfigured()) providers.push("google");
+      if (isGitHubOAuthConfigured()) providers.push("github");
+      return { providers };
+    }),
 
   createUserWithEmailAndPassword: publicProcedure
     .meta({

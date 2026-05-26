@@ -9,6 +9,7 @@ import {
   getGoogleAuthorizationUrl,
   getGoogleOAuthProfile,
 } from "@repo/services/auth-providers/google";
+import { isGitHubOAuthConfigured, isGoogleOAuthConfigured } from "@repo/services/env";
 import { OAUTH_STATE_COOKIE_NAME } from "@repo/trpc/server/utils/cookie";
 import { env } from "../env";
 import {
@@ -41,12 +42,22 @@ function verifyState(queryState: string, cookieState: unknown) {
 }
 
 oauthRouter.get("/google/start", (_req, res) => {
+  if (!isGoogleOAuthConfigured()) {
+    res.redirect(redirectToFailure("oauth_not_configured"));
+    return;
+  }
+
   const state = createOAuthState();
   setOAuthStateCookie(res, state);
   res.redirect(getGoogleAuthorizationUrl(state));
 });
 
 oauthRouter.get("/github/start", (_req, res) => {
+  if (!isGitHubOAuthConfigured()) {
+    res.redirect(redirectToFailure("oauth_not_configured"));
+    return;
+  }
+
   const state = createOAuthState();
   setOAuthStateCookie(res, state);
   res.redirect(getGitHubAuthorizationUrl(state));

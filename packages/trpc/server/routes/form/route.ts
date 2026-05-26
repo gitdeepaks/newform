@@ -19,6 +19,8 @@ import {
   getFormInputSchema,
   getFormOutputSchema,
   getPublicFormBySlugInputSchema,
+  getPublicRedirectByIdInputSchema,
+  getPublicRedirectByIdOutputSchema,
   getSubmissionsInputSchema,
   getSubmissionsOutputSchema,
   lifecycleFormIdInputSchema,
@@ -31,8 +33,6 @@ import {
   listFormsOutputSchema,
   listThemesInputSchema,
   listThemesOutputSchema,
-  submitFormInputSchema,
-  submitFormOutputSchema,
   submitPublicResponseInputSchema,
   submitPublicResponseOutputSchema,
   updateFieldInputSchema,
@@ -159,19 +159,18 @@ export const formRouter = router({
       return formService.updateSlug({ ...input, userId: ctx.user.id });
     }),
 
-  getForm: publicProcedure
+  getPublicRedirectById: publicProcedure
     .meta({
       openapi: {
         method: "GET",
-        path: getPath("/getForm"),
+        path: getPath("/getPublicRedirectById"),
         tags: TAGS,
       },
     })
-    .input(getFormInputSchema)
-    .output(getFormOutputSchema)
+    .input(getPublicRedirectByIdInputSchema)
+    .output(getPublicRedirectByIdOutputSchema)
     .query(async ({ input }) => {
-      const form = await formService.getFormById(input);
-      return form;
+      return formService.getPublicRedirectById(input);
     }),
 
   getPublicFormBySlug: publicProcedure
@@ -229,21 +228,6 @@ export const formRouter = router({
     .output(assignThemeOutputSchema)
     .mutation(async ({ input, ctx }) => {
       return themeService.assignTheme({ ...input, userId: ctx.user.id });
-    }),
-
-  submitForm: publicProcedure
-    .meta({
-      openapi: {
-        method: "POST",
-        path: getPath("/submitForm"),
-        tags: TAGS,
-      },
-    })
-    .input(submitFormInputSchema)
-    .output(submitFormOutputSchema)
-    .mutation(async ({ input }) => {
-      const { id } = await formSubmissionService.createSubmission(input);
-      return { id };
     }),
 
   submitPublicResponse: publicProcedure

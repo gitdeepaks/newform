@@ -54,6 +54,10 @@ export const getPublicFormBySlugInputSchema = z.object({
   slug: slugSchema.describe("The public form slug"),
 });
 
+export const getPublicRedirectByIdInputSchema = z.object({
+  formId: z.string().uuid().describe("The legacy public form id"),
+});
+
 export const listPublicFormsInputSchema = z.undefined();
 
 export type CreateFormInputSchemaType = z.infer<typeof createFormInputSchema>;
@@ -66,4 +70,5 @@ export type UnpublishFormInputSchemaType = z.infer<typeof unpublishFormInputSche
 export type UpdateVisibilityInputSchemaType = z.infer<typeof updateVisibilityInputSchema>;
 export type UpdateSlugInputSchemaType = z.infer<typeof updateSlugInputSchema>;
 export type GetPublicFormBySlugInputSchemaType = z.infer<typeof getPublicFormBySlugInputSchema>;
+export type GetPublicRedirectByIdInputSchemaType = z.infer<typeof getPublicRedirectByIdInputSchema>;
 export type ListPublicFormsInputSchemaType = z.infer<typeof listPublicFormsInputSchema>;

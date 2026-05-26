@@ -7,6 +7,7 @@ import {
   getFormByOwnerInputSchema,
   getFormByIdInputSchema,
   getPublicFormBySlugInputSchema,
+  getPublicRedirectByIdInputSchema,
   listPublicFormsInputSchema,
   listFromByUserIdInputSchema,
   publishFormInputSchema,
@@ -18,6 +19,7 @@ import {
   type GetFormByOwnerInputSchemaType,
   type GetFormByIdInputSchemaType,
   type GetPublicFormBySlugInputSchemaType,
+  type GetPublicRedirectByIdInputSchemaType,
   type ListPublicFormsInputSchemaType,
   type ListFromByUserIdInputSchemaType,
   type PublishFormInputSchemaType,
@@ -308,6 +310,31 @@ class FormService {
     }
 
     return this.getFormById({ formId: form.id });
+  }
+
+  public async getPublicRedirectById(input: GetPublicRedirectByIdInputSchemaType) {
+    const { formId } = await getPublicRedirectByIdInputSchema.parseAsync(input);
+
+    const rows = await db
+      .select({
+        slug: formsTable.slug,
+        status: formsTable.status,
+        expiresAt: formsTable.expiresAt,
+      })
+      .from(formsTable)
+      .where(eq(formsTable.id, formId))
+      .limit(1);
+
+    const form = rows[0];
+    if (!form || form.status !== "published") {
+      throw new Error(`Form With ${formId} Not Found`);
+    }
+
+    if (form.expiresAt && form.expiresAt.getTime() < Date.now()) {
+      throw new Error("This form is closed");
+    }
+
+    return { slug: form.slug };
   }
 
   public async listPublicForms(input: ListPublicFormsInputSchemaType) {
