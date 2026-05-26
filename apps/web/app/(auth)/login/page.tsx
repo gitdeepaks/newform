@@ -1,5 +1,5 @@
 import { AuthGate } from "@/components/auth/auth-gate";
-import { LoginForm } from "@/components/login-form";
+import { LoginForm } from "@/custom/components/auth/login-form";
 
 export default function Page() {
   return (

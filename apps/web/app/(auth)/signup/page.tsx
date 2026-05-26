@@ -1,7 +1,7 @@
 import { AuthGate } from "@/components/auth/auth-gate";
 import { GalleryVerticalEnd } from "lucide-react";
 
-import { SignupForm } from "@/components/signup-form";
+import { SignupForm } from "@/custom/components/auth/signup-form";
 
 export default function SignupPage() {
   return (
