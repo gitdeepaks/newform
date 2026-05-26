@@ -14,7 +14,7 @@ import { oauthRouter } from "./routes/oauth";
 
 export const app = express();
 const openApiDocument = generateOpenApiDocument(serverRouter, {
-  title: "Streamyst OpenAPI",
+  title: "NewForm OpenAPI",
   version: "1.0.0",
   baseUrl: env.BASE_URL.concat("/api"),
 });
@@ -22,7 +22,7 @@ const openApiDocument = generateOpenApiDocument(serverRouter, {
 if (env.NODE_ENV !== "prod") {
   app.use(
     cors({
-      origin: "http://localhost:3000",
+      origin: ["http://localhost:3000", env.WEB_APP_URL],
       credentials: true,
     }),
   );
