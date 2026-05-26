@@ -28,6 +28,10 @@ export function AuthGate({ mode, children }: AuthGateProps) {
     }
   }, [isFetched, mode, router, user]);
 
+  if (mode === "guest" && (!isFetched || isLoading)) {
+    return children;
+  }
+
   if (!isFetched || isLoading) {
     return (
       <div className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">

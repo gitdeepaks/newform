@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
-import { FaGithub } from "react-icons/fa";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -139,7 +138,6 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
 
   const isSubmitting = form.formState.isSubmitting || createUserWithEmailAndPasswordIsPending;
   const googleIsAvailable = providers.includes("google");
-  const githubIsAvailable = providers.includes("github");
 
   useEffect(() => {
     const error = searchParams.get("error");
@@ -193,14 +191,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
         >
           {providersIsLoading ? "Checking Google..." : "Continue with Google"}
         </SocialButton>
-        <SocialButton
-          disabled={providersIsLoading || isSubmitting || !githubIsAvailable}
-          icon={<FaGithub size={18} className="shrink-0" />}
-          onClick={() => startOAuth("github")}
-        >
-          {providersIsLoading ? "Checking GitHub..." : "Continue with GitHub"}
-        </SocialButton>
-        {!providersIsLoading && !googleIsAvailable && !githubIsAvailable ? (
+        {!providersIsLoading && !googleIsAvailable ? (
           <p className="text-center text-xs text-muted-foreground">
             Social signup is not configured in this environment. Use email and password.
           </p>

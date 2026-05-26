@@ -1,5 +1,6 @@
 import { AuthGate } from "@/components/auth/auth-gate";
 import { GalleryVerticalEnd } from "lucide-react";
+import { Suspense } from "react";
 
 import { SignupForm } from "@/custom/components/auth/signup-form";
 
@@ -14,7 +15,9 @@ export default function SignupPage() {
             </div>
             NewForm
           </a>
-          <SignupForm />
+          <Suspense fallback={null}>
+            <SignupForm />
+          </Suspense>
         </div>
       </div>
     </AuthGate>

@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils";
 import { useOAuthProviders, useOAuthSignin, useSignin } from "@/hooks/api/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 
 type LoginFormValues = {
@@ -37,7 +36,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const router = useRouter();
   const searchParams = useSearchParams();
   const googleIsAvailable = providers.includes("google");
-  const githubIsAvailable = providers.includes("github");
 
   useEffect(() => {
     const error = searchParams.get("error");
@@ -98,18 +96,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
           <FcGoogle size={18} className="shrink-0" />
           {providersIsLoading ? "Checking Google..." : "Login with Google"}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          disabled={providersIsLoading || !githubIsAvailable}
-          onClick={() => startOAuth("github")}
-          className="h-10 w-full justify-center gap-2 border-input bg-background font-normal shadow-none hover:bg-accent/60"
-        >
-          <FaGithub size={18} className="shrink-0" />
-          {providersIsLoading ? "Checking GitHub..." : "Login with GitHub"}
-        </Button>
-        {!providersIsLoading && !googleIsAvailable && !githubIsAvailable ? (
+        {!providersIsLoading && !googleIsAvailable ? (
           <p className="text-center text-xs text-muted-foreground">
             Social login is not configured in this environment. Use email and password.
           </p>
