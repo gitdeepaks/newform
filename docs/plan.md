@@ -42,7 +42,7 @@ Implemented or partially implemented:
 Important gaps:
 
 - README polish, deployment, and final Scalar docs verification remain.
-- Optional bonus features remain after final verification.
+- Optional bonus features remain after final verification. QR code sharing is completed as a UI-only builder feature using existing public slug URLs. Admin panel foundation is completed.
 
 ## Sprint Strategy
 
@@ -60,7 +60,7 @@ We should not try to implement every bonus. The fastest winning path is to make 
 Cut scope if needed:
 
 - Skip conditional logic.
-- Skip admin dashboard.
+- Admin dashboard is completed as a bonus feature.
 - Skip real payment.
 - Skip real email provider; store/log email events only.
 - Implement QR/password only after core is stable. CSV export is already completed.
@@ -656,10 +656,10 @@ Acceptance:
 
 1. CSV export for responses - Completed in Priority 4.
 2. Form preview before publishing - Completed.
-3. QR code sharing.
-4. Form expiry/response limit UI if DB already exists.
-5. Password-protected forms.
-6. Clone/archive form.
+3. QR code sharing - Completed. UI-only flow using existing `/f/[slug]` public URLs.
+4. Form expiry/response limit UI - Completed. Backend fields and submission checks already existed; builder settings and public closed states were added.
+5. Clone form - Completed. Creators can duplicate owned forms into new draft forms with fields/theme copied and responses excluded.
+6. Password-protected forms.
 7. Conditional logic.
 8. Multi-page form experience.
 9. Admin dashboard.
@@ -672,6 +672,69 @@ Verification completed for form preview:
 
 - [x] `pnpm check-types` passed.
 - [x] `pnpm build` passed.
+
+Completed files for QR code sharing:
+
+- `apps/web/custom/components/forms/form-builder-page.tsx`
+- `apps/web/package.json`
+- `pnpm-lock.yaml`
+
+Verification completed for QR code sharing:
+
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
+
+Completed files for form expiry/response limit UI:
+
+- `packages/services/form/index.ts`
+- `apps/web/custom/components/forms/form-builder-page.tsx`
+- `apps/web/custom/components/public-form/public-form-page.tsx`
+
+Verification completed for form expiry/response limit UI:
+
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
+
+Completed files for clone form:
+
+- `packages/services/form/model.ts`
+- `packages/services/form/index.ts`
+- `packages/trpc/server/routes/form/model.ts`
+- `packages/trpc/server/routes/form/route.ts`
+- `apps/web/hooks/api/form/index.ts`
+- `apps/web/custom/components/forms/forms-page.tsx`
+
+Verification completed for clone form:
+
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
+
+## Bonus: Admin Panel - Completed
+
+Implemented admin panel foundation:
+
+- [x] Role-based admin access with backend `adminProcedure` enforcement.
+- [x] Suspended users are blocked from protected procedures.
+- [x] Seeded admin account: `admin@example.com` / `password123`.
+- [x] Admin dashboard metrics.
+- [x] User management for role and status changes.
+- [x] Form moderation for force-unpublish, archive, and restore.
+- [x] Submission metadata list without answer values.
+- [x] Audit logs for admin mutations.
+- [x] Admin sidebar link only appears for admin users.
+- [x] Admin mutations and audit logs are atomic via database transactions.
+- [x] Admin one-click destructive actions replaced with confirmation dialogs.
+- [x] Admin list pages include practical filters, empty states, and pagination controls.
+- [x] Admin service non-null assertions removed.
+
+Verification completed for admin panel:
+
+- [x] `pnpm db:generate` passed.
+- [x] `pnpm db:migrate` passed.
+- [x] `pnpm db:seed` passed twice.
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
+- [x] Admin hardening verification: `pnpm check-types`, `pnpm build`, and `git diff --check` passed.
 
 ## Final Feature Checklist
 
