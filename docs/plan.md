@@ -655,7 +655,7 @@ Acceptance:
 ## Bonus Priority Only After Core Works
 
 1. CSV export for responses - Completed in Priority 4.
-2. Form preview before publishing.
+2. Form preview before publishing - Completed.
 3. QR code sharing.
 4. Form expiry/response limit UI if DB already exists.
 5. Password-protected forms.
@@ -663,6 +663,15 @@ Acceptance:
 7. Conditional logic.
 8. Multi-page form experience.
 9. Admin dashboard.
+
+Completed files for form preview:
+
+- `apps/web/app/dashboard/forms/[id]/page.tsx`
+
+Verification completed for form preview:
+
+- [x] `pnpm check-types` passed.
+- [x] `pnpm build` passed.
 
 ## Final Feature Checklist
 
