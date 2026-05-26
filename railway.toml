@@ -1,0 +1,10 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "pnpm --filter @repo/api build"
+
+[deploy]
+startCommand = "pnpm --filter @repo/api start"
+restartPolicyType = "ON_FAILURE"
+
+[variables]
+RAILPACK_NODE_VERSION = "22.16.0"
