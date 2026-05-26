@@ -1,5 +1,5 @@
 import { and, count, db, eq, ne } from "@repo/database";
-import { formFieldsTable, formsTable, themesTable } from "@repo/database/schema";
+import { formFieldsTable, formsTable, formSubmissionsTable, themesTable } from "@repo/database/schema";
 import type { ThemeTokens } from "@repo/database/schema";
 import { formFieldTypeSchema } from "../form-field/model";
 import {
@@ -295,7 +295,12 @@ class FormService {
     const { slug } = await getPublicFormBySlugInputSchema.parseAsync(input);
 
     const rows = await db
-      .select({ id: formsTable.id, status: formsTable.status, expiresAt: formsTable.expiresAt })
+      .select({
+        id: formsTable.id,
+        status: formsTable.status,
+        expiresAt: formsTable.expiresAt,
+        responseLimit: formsTable.responseLimit,
+      })
       .from(formsTable)
       .where(eq(formsTable.slug, slug))
       .limit(1);
@@ -307,6 +312,17 @@ class FormService {
 
     if (form.expiresAt && form.expiresAt.getTime() < Date.now()) {
       throw new Error("This form is closed");
+    }
+
+    if (form.responseLimit !== null) {
+      const submissionCount = await db
+        .select({ value: count() })
+        .from(formSubmissionsTable)
+        .where(eq(formSubmissionsTable.formId, form.id));
+
+      if ((submissionCount[0]?.value ?? 0) >= form.responseLimit) {
+        throw new Error("This form has reached its response limit");
+      }
     }
 
     return this.getFormById({ formId: form.id });

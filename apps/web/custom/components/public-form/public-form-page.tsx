@@ -21,6 +21,18 @@ type Field = NonNullable<ReturnType<typeof usePublicForm>["form"]>["fields"][num
 type PublicAnswer = string | string[] | boolean;
 type PublicAnswers = Record<string, PublicAnswer>;
 
+function getPublicFormErrorMessage(message: string | undefined): string {
+  if (message === "This form is closed") {
+    return "This form is closed and is no longer accepting responses.";
+  }
+
+  if (message === "This form has reached its response limit") {
+    return "This form has reached its response limit and is no longer accepting responses.";
+  }
+
+  return "This form is unavailable or has not been published.";
+}
+
 const inputTypeMap: Record<Field["type"], string> = {
   SHORT_TEXT: "text",
   LONG_TEXT: "text",
@@ -107,8 +119,8 @@ export function PublicFormPage({ slug }: PublicSlugFormPageProps) {
       toast.success("Form submitted");
       setIsSubmitted(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to submit form";
-      toast.error(message);
+      const message = error instanceof Error ? error.message : undefined;
+      toast.error(getPublicFormErrorMessage(message));
     }
   }
 
@@ -125,7 +137,7 @@ export function PublicFormPage({ slug }: PublicSlugFormPageProps) {
           </div>
         ) : formError ? (
           <Alert variant="destructive">
-            <AlertDescription>This form is unavailable or has not been published.</AlertDescription>
+            <AlertDescription>{getPublicFormErrorMessage(formError.message)}</AlertDescription>
           </Alert>
         ) : isSubmitted ? (
           <Card style={cardStyle}>

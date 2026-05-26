@@ -115,6 +115,15 @@ const settingsSchema = z.object({
   visibility: z.enum(["public", "unlisted"]),
   thankYouTitle: z.string().trim().min(1).max(120),
   thankYouMessage: z.string().trim().min(1).max(300),
+  expiresAt: z.string().optional(),
+  responseLimit: z
+    .string()
+    .optional()
+    .refine((value) => {
+      if (!value?.trim()) return true;
+      const parsed = Number(value);
+      return Number.isInteger(parsed) && parsed > 0;
+    }, "Use a positive whole number"),
 });
 
 type SettingsValues = z.infer<typeof settingsSchema>;
@@ -216,6 +225,26 @@ const validationToFieldValues = (validation: FieldValidation | null) => ({
   dateMax: validation?.dateMax ?? "",
 });
 
+function dateToDateTimeLocalValue(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function dateTimeLocalValueToDate(value: string | undefined): Date | null {
+  if (!value?.trim()) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function responseLimitValueToNumber(value: string | undefined): number | null {
+  if (!value?.trim()) return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function FormBuilderPage({ formId: id }: FormBuilderPageProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -257,6 +286,8 @@ export function FormBuilderPage({ formId: id }: FormBuilderPageProps) {
       visibility: "unlisted",
       thankYouTitle: "Thanks for your response",
       thankYouMessage: "Your submission has been recorded.",
+      expiresAt: "",
+      responseLimit: "",
     },
   });
 
@@ -269,6 +300,8 @@ export function FormBuilderPage({ formId: id }: FormBuilderPageProps) {
       visibility: ownerForm.visibility === "public" ? "public" : "unlisted",
       thankYouTitle: ownerForm.thankYouTitle ?? "Thanks for your response",
       thankYouMessage: ownerForm.thankYouMessage ?? "Your submission has been recorded.",
+      expiresAt: dateToDateTimeLocalValue(ownerForm.expiresAt),
+      responseLimit: ownerForm.responseLimit?.toString() ?? "",
     });
   }, [ownerForm, settingsForm]);
 
@@ -360,6 +393,8 @@ export function FormBuilderPage({ formId: id }: FormBuilderPageProps) {
         description: values.description || null,
         thankYouTitle: values.thankYouTitle,
         thankYouMessage: values.thankYouMessage,
+        expiresAt: dateTimeLocalValueToDate(values.expiresAt),
+        responseLimit: responseLimitValueToNumber(values.responseLimit),
       });
       if (values.slug !== ownerForm?.slug) {
         await updateSlugAsync({ formId: id, slug: values.slug });
@@ -581,6 +616,45 @@ export function FormBuilderPage({ formId: id }: FormBuilderPageProps) {
                           <FormControl>
                             <Input {...field} disabled={lifecycleIsPending} />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={settingsForm.control}
+                      name="expiresAt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Expiry date and time</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="datetime-local" disabled={lifecycleIsPending} />
+                          </FormControl>
+                          <p className="text-sm text-muted-foreground">
+                            Leave empty to keep this form open until unpublished.
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={settingsForm.control}
+                      name="responseLimit"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Response limit</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              min="1"
+                              step="1"
+                              inputMode="numeric"
+                              disabled={lifecycleIsPending}
+                            />
+                          </FormControl>
+                          <p className="text-sm text-muted-foreground">
+                            Leave empty for unlimited responses.
+                          </p>
                           <FormMessage />
                         </FormItem>
                       )}
