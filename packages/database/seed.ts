@@ -3,8 +3,10 @@ import { eq, inArray } from "drizzle-orm";
 import db from "./index";
 import {
   formFieldsTable,
+  formVersionsTable,
   formsTable,
   formSubmissionsTable,
+  responseAnswersTable,
   responseEventsTable,
   themesTable,
   usersTable,
@@ -125,8 +127,10 @@ async function main() {
   const oldForms = await db.select({ id: formsTable.id }).from(formsTable).where(inArray(formsTable.slug, seededSlugs));
   const oldFormIds = oldForms.map((form) => form.id);
   if (oldFormIds.length > 0) {
+    await db.delete(responseAnswersTable).where(inArray(responseAnswersTable.formId, oldFormIds));
     await db.delete(responseEventsTable).where(inArray(responseEventsTable.formId, oldFormIds));
     await db.delete(formSubmissionsTable).where(inArray(formSubmissionsTable.formId, oldFormIds));
+    await db.delete(formVersionsTable).where(inArray(formVersionsTable.formId, oldFormIds));
     await db.delete(formFieldsTable).where(inArray(formFieldsTable.formId, oldFormIds));
     await db.delete(formsTable).where(inArray(formsTable.id, oldFormIds));
   }
@@ -208,7 +212,46 @@ async function main() {
     if (!insertedForm) continue;
 
     const fields = form.fields.map((formField) => ({ ...formField, formId: insertedForm.id }));
-    const insertedFields = await db.insert(formFieldsTable).values(fields).returning({ id: formFieldsTable.id, label: formFieldsTable.label });
+    const insertedFields = await db.insert(formFieldsTable).values(fields).returning({
+      id: formFieldsTable.id,
+      label: formFieldsTable.label,
+      labelKey: formFieldsTable.labelKey,
+      description: formFieldsTable.description,
+      placeholder: formFieldsTable.placeholder,
+      type: formFieldsTable.type,
+      isRequired: formFieldsTable.isRequired,
+      pageIndex: formFieldsTable.pageIndex,
+      index: formFieldsTable.index,
+      options: formFieldsTable.options,
+      validation: formFieldsTable.validation,
+      visibilityCondition: formFieldsTable.visibilityCondition,
+    });
+
+    const [activeVersion] = form.status === "published"
+      ? await db
+          .insert(formVersionsTable)
+          .values({
+            formId: insertedForm.id,
+            versionNumber: 1,
+            status: "active",
+            createdBy: userId,
+            schemaSnapshot: {
+              form: {
+                id: insertedForm.id,
+                title: form.title,
+                description: form.description,
+                slug: form.slug,
+                thankYouTitle: "Thanks for your response",
+                thankYouMessage: "Your submission has been recorded.",
+              },
+              fields: insertedFields,
+              createdAt: new Date().toISOString(),
+            },
+          })
+          .returning({ id: formVersionsTable.id })
+      : [];
+
+    if (!activeVersion) continue;
 
     const submissionCount = form.visibility === "public" && form.status === "published" ? 20 : 3;
     for (let index = 0; index < submissionCount; index += 1) {
@@ -224,17 +267,39 @@ async function main() {
         .insert(formSubmissionsTable)
         .values({
           formId: insertedForm.id,
-          values,
+          formVersionId: activeVersion.id,
           respondentEmail: `demo${index + 1}@example.com`,
           metadata: { ip: "127.0.0.1", userAgent: "Seed", slug: form.slug },
+          rawPayload: values,
           submittedAt: new Date(Date.now() - index * 86_400_000),
         })
         .returning({ id: formSubmissionsTable.id });
       if (submission) {
+        await db.insert(responseAnswersTable).values(
+          values.map((answer) => {
+            const insertedField = insertedFields.find((fieldRow) => fieldRow.id === answer.formFieldId);
+            if (!insertedField) throw new Error("Failed to seed response answer");
+            return {
+              submissionId: submission.id,
+              formId: insertedForm.id,
+              formVersionId: activeVersion.id,
+              fieldId: insertedField.id,
+              fieldKey: insertedField.labelKey,
+              fieldLabelSnapshot: insertedField.label,
+              fieldType: insertedField.type,
+              rawValue: answer.value,
+              normalizedText: answer.value,
+              normalizedNumber: Number.isFinite(Number(answer.value)) ? String(Number(answer.value)) : null,
+              normalizedDate: null,
+              optionValues: null,
+            };
+          }),
+        );
         await db.insert(responseEventsTable).values({
           formId: insertedForm.id,
+          formVersionId: activeVersion.id,
           submissionId: submission.id,
-          type: "submission",
+          type: "submit",
           metadata: { ip: "127.0.0.1", userAgent: "Seed", slug: form.slug },
         });
       }
@@ -243,6 +308,7 @@ async function main() {
     await db.insert(responseEventsTable).values(
       Array.from({ length: submissionCount + 8 }, () => ({
         formId: insertedForm.id,
+        formVersionId: activeVersion.id,
         type: "view",
         metadata: { ip: "127.0.0.1", userAgent: "Seed", slug: form.slug },
       })),

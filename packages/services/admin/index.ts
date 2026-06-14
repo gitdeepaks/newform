@@ -4,6 +4,7 @@ import {
   formFieldsTable,
   formsTable,
   formSubmissionsTable,
+  responseAnswersTable,
   usersTable,
 } from "@repo/database/schema";
 import AuditLogService from "../audit-log";
@@ -412,18 +413,29 @@ class AdminService {
       "formSubmissions",
       eq(formSubmissionsTable.formId, formId),
     );
-    const recentSubmissions = await db
+    const recentSubmissionRows = await db
       .select({
         id: formSubmissionsTable.id,
         respondentEmail: formSubmissionsTable.respondentEmail,
         metadata: formSubmissionsTable.metadata,
         submittedAt: formSubmissionsTable.submittedAt,
-        valueCount: sql<number>`coalesce(json_array_length(${formSubmissionsTable.values}), 0)::int`,
       })
       .from(formSubmissionsTable)
       .where(eq(formSubmissionsTable.formId, formId))
       .orderBy(desc(formSubmissionsTable.submittedAt))
       .limit(10);
+    const answerCounts = await db
+      .select({ submissionId: responseAnswersTable.submissionId, total: count() })
+      .from(responseAnswersTable)
+      .where(eq(responseAnswersTable.formId, formId))
+      .groupBy(responseAnswersTable.submissionId);
+    const valueCountBySubmission = new Map(
+      answerCounts.map((row) => [row.submissionId, row.total]),
+    );
+    const recentSubmissions = recentSubmissionRows.map((row) => ({
+      ...row,
+      valueCount: valueCountBySubmission.get(row.id) ?? 0,
+    }));
     const auditLogs = await this.auditLogService.listAuditLogs({
       targetType: "form",
       targetId: formId,
@@ -510,6 +522,10 @@ class AdminService {
     if (formId) filters.push(eq(formSubmissionsTable.formId, formId));
     if (creatorId) filters.push(eq(formsTable.createdBy, creatorId));
     const where = filters.length > 0 ? and(...filters) : undefined;
+    const answerFilters: SQL[] = [];
+    if (formId) answerFilters.push(eq(responseAnswersTable.formId, formId));
+    if (creatorId) answerFilters.push(eq(formsTable.createdBy, creatorId));
+    const answerWhere = answerFilters.length > 0 ? and(...answerFilters) : undefined;
     const [totalRow] = await db
       .select({ total: count() })
       .from(formSubmissionsTable)
@@ -525,7 +541,6 @@ class AdminService {
         respondentEmail: formSubmissionsTable.respondentEmail,
         metadata: formSubmissionsTable.metadata,
         submittedAt: formSubmissionsTable.submittedAt,
-        valueCount: sql<number>`coalesce(json_array_length(${formSubmissionsTable.values}), 0)::int`,
       })
       .from(formSubmissionsTable)
       .leftJoin(formsTable, eq(formSubmissionsTable.formId, formsTable.id))
@@ -534,7 +549,19 @@ class AdminService {
       .orderBy(desc(formSubmissionsTable.submittedAt))
       .limit(pageSize)
       .offset((page - 1) * pageSize);
-    return { rows, pagination: this.pagination(page, pageSize, totalRow?.total ?? 0) };
+    const answerCounts = await db
+      .select({ submissionId: responseAnswersTable.submissionId, total: count() })
+      .from(responseAnswersTable)
+      .leftJoin(formsTable, eq(responseAnswersTable.formId, formsTable.id))
+      .where(answerWhere)
+      .groupBy(responseAnswersTable.submissionId);
+    const valueCountBySubmission = new Map(
+      answerCounts.map((row) => [row.submissionId, row.total]),
+    );
+    return {
+      rows: rows.map((row) => ({ ...row, valueCount: valueCountBySubmission.get(row.id) ?? 0 })),
+      pagination: this.pagination(page, pageSize, totalRow?.total ?? 0),
+    };
   }
 }
 

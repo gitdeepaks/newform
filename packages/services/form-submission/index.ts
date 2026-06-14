@@ -2,12 +2,13 @@ import { and, count, db, eq, sql } from "@repo/database";
 import {
   emailEventsTable,
   formFieldsTable,
+  formVersionsTable,
   formsTable,
   formSubmissionsTable,
+  responseAnswersTable,
   responseEventsTable,
   usersTable,
   type FormSubmissionMetadata,
-  type FormSubmissionValueRow,
 } from "@repo/database/schema";
 import {
   parseStringArray,
@@ -32,8 +33,51 @@ import {
 } from "./model";
 import { checkRateLimit } from "./rate-limit";
 
-function getAnswerValue(values: FormSubmissionValueRow | null | undefined, fieldId: string) {
-  return values?.find((value) => value.formFieldId === fieldId)?.value;
+type ResponseAnswerValue = string | string[] | number | boolean | null;
+type RebuiltAnswer = { formFieldId: string; value: string };
+
+function stringifyAnswerValue(value: ResponseAnswerValue): string {
+  if (value === null) return "";
+  if (Array.isArray(value)) return JSON.stringify(value);
+  return String(value);
+}
+
+function getAnswerValue(values: RebuiltAnswer[], fieldId: string) {
+  return values.find((value) => value.formFieldId === fieldId)?.value;
+}
+
+function groupAnswersBySubmission(
+  answers: { submissionId: string; fieldId: string; rawValue: ResponseAnswerValue }[],
+) {
+  const answerMap = new Map<string, RebuiltAnswer[]>();
+  for (const answer of answers) {
+    const current = answerMap.get(answer.submissionId) ?? [];
+    current.push({ formFieldId: answer.fieldId, value: stringifyAnswerValue(answer.rawValue) });
+    answerMap.set(answer.submissionId, current);
+  }
+  return answerMap;
+}
+
+function normalizeAnswerForInsert(field: PublicField & { label: string; labelKey: string }, value: string) {
+  const options = field.options ?? [];
+  const hasOptions = options.length > 0;
+  const arrayValue = field.type === "MULTI_SELECT" || (field.type === "CHECKBOX" && hasOptions)
+    ? parseStringArray(value)
+    : null;
+  const numberValue = field.type === "NUMBER" || field.type === "RATING" ? Number(value) : null;
+  const dateValue = field.type === "DATE" && value ? new Date(value) : null;
+
+  return {
+    fieldId: field.id,
+    fieldKey: field.labelKey,
+    fieldLabelSnapshot: field.label,
+    fieldType: field.type,
+    rawValue: arrayValue ?? (numberValue !== null && Number.isFinite(numberValue) ? numberValue : value),
+    normalizedText: arrayValue ? null : value,
+    normalizedNumber: numberValue !== null && Number.isFinite(numberValue) ? String(numberValue) : null,
+    normalizedDate: dateValue && !Number.isNaN(dateValue.getTime()) ? dateValue : null,
+    optionValues: arrayValue,
+  };
 }
 
 
@@ -67,11 +111,20 @@ class FormSubmissionService {
   public async createSubmission(input: CreateSubmissionInputSchemaType) {
     const { formId, values } = await createSubmissionInputSchema.parseAsync(input);
 
+    const versionRows = await db
+      .select({ id: formVersionsTable.id, schemaSnapshot: formVersionsTable.schemaSnapshot })
+      .from(formVersionsTable)
+      .where(and(eq(formVersionsTable.formId, formId), eq(formVersionsTable.status, "active")))
+      .limit(1);
+    const version = versionRows[0];
+    if (!version) throw new Error("Active form version not found");
+
     const submissionInsertResult = await db
       .insert(formSubmissionsTable)
       .values({
         formId,
-        values,
+        formVersionId: version.id,
+        rawPayload: values,
       })
       .returning({
         id: formSubmissionsTable.id,
@@ -85,9 +138,7 @@ class FormSubmissionService {
       throw new Error("Failed to create submission");
     }
 
-    return {
-      id: submissionInsertResult[0].id,
-    };
+    return { id: submissionInsertResult[0].id };
   }
 
   public async submitPublicResponse(input: SubmitPublicResponseInputSchemaType) {
@@ -117,17 +168,14 @@ class FormSubmissionService {
     if (form.expiresAt && form.expiresAt.getTime() < Date.now())
       throw new Error("This form is closed");
 
-    const fields = await db
-      .select({
-        id: formFieldsTable.id,
-        type: formFieldsTable.type,
-        isRequired: formFieldsTable.isRequired,
-        options: formFieldsTable.options,
-        validation: formFieldsTable.validation,
-        visibilityCondition: formFieldsTable.visibilityCondition,
-      })
-      .from(formFieldsTable)
-      .where(eq(formFieldsTable.formId, form.id));
+    const versionRows = await db
+      .select({ id: formVersionsTable.id, schemaSnapshot: formVersionsTable.schemaSnapshot })
+      .from(formVersionsTable)
+      .where(and(eq(formVersionsTable.formId, form.id), eq(formVersionsTable.status, "active")))
+      .limit(1);
+    const activeVersion = versionRows[0];
+    if (!activeVersion) throw new Error("Active form version not found");
+    const fields = activeVersion.schemaSnapshot.fields;
 
     const fieldById = new Map(fields.map((field) => [field.id, field]));
     const answerByFieldId = new Map(values.map((answer) => [answer.formFieldId, answer.value]));
@@ -195,17 +243,33 @@ class FormSubmissionService {
         .insert(formSubmissionsTable)
         .values({
           formId: form.id,
-          values: visibleValues,
+          formVersionId: activeVersion.id,
           respondentEmail: submittedRespondentEmail,
           metadata: responseMetadata,
+          rawPayload: visibleValues,
         })
         .returning({ id: formSubmissionsTable.id });
 
       const insertedSubmissionId = submissionInsertResult[0]?.id;
       if (!insertedSubmissionId) throw new Error("Failed to create submission");
 
+      if (visibleValues.length > 0) {
+        const normalizedAnswers = visibleValues.map((answer) => {
+          const field = fieldById.get(answer.formFieldId);
+          if (!field) throw new Error("Unknown form field submitted");
+          return {
+            submissionId: insertedSubmissionId,
+            formId: form.id,
+            formVersionId: activeVersion.id,
+            ...normalizeAnswerForInsert(field, answer.value),
+          };
+        });
+        await tx.insert(responseAnswersTable).values(normalizedAnswers);
+      }
+
       await tx.insert(responseEventsTable).values({
         formId: form.id,
+        formVersionId: activeVersion.id,
         submissionId: insertedSubmissionId,
         type: "submit",
         metadata: responseMetadata,
@@ -244,17 +308,29 @@ class FormSubmissionService {
     const { formId, userId } = await getSubmissionsByFormIdInputSchema.parseAsync(input);
     await this.verifyOwner(formId, userId);
 
-    return db
+    const submissions = await db
       .select({
         id: formSubmissionsTable.id,
         formId: formSubmissionsTable.formId,
-        values: formSubmissionsTable.values,
         createdAt: formSubmissionsTable.createdAt,
         updatedAt: formSubmissionsTable.updatedAt,
       })
       .from(formSubmissionsTable)
       .where(eq(formSubmissionsTable.formId, formId))
       .orderBy(formSubmissionsTable.createdAt);
+    const answers = await db
+      .select({
+        submissionId: responseAnswersTable.submissionId,
+        fieldId: responseAnswersTable.fieldId,
+        rawValue: responseAnswersTable.rawValue,
+      })
+      .from(responseAnswersTable)
+      .where(eq(responseAnswersTable.formId, formId));
+    const answersBySubmission = groupAnswersBySubmission(answers);
+    return submissions.map((submission) => ({
+      ...submission,
+      values: answersBySubmission.get(submission.id) ?? [],
+    }));
   }
 
   public async listResponses(input: ListResponsesInputSchemaType) {
@@ -268,7 +344,6 @@ class FormSubmissionService {
         .select({
           id: formSubmissionsTable.id,
           respondentEmail: formSubmissionsTable.respondentEmail,
-          values: formSubmissionsTable.values,
           metadata: formSubmissionsTable.metadata,
           submittedAt: formSubmissionsTable.submittedAt,
           createdAt: formSubmissionsTable.createdAt,
@@ -283,11 +358,23 @@ class FormSubmissionService {
         .from(formSubmissionsTable)
         .where(eq(formSubmissionsTable.formId, formId)),
     ]);
+    const answers = await db
+      .select({
+        submissionId: responseAnswersTable.submissionId,
+        fieldId: responseAnswersTable.fieldId,
+        rawValue: responseAnswersTable.rawValue,
+      })
+      .from(responseAnswersTable)
+      .where(eq(responseAnswersTable.formId, formId));
+    const answersBySubmission = groupAnswersBySubmission(answers);
     const total = totalRows[0]?.value ?? 0;
 
     return {
       fields,
-      responses,
+      responses: responses.map((response) => ({
+        ...response,
+        values: answersBySubmission.get(response.id) ?? [],
+      })),
       pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
     };
   }
@@ -300,7 +387,7 @@ class FormSubmissionService {
       this.getResponseFields(formId),
       db
         .select({
-          values: formSubmissionsTable.values,
+          id: formSubmissionsTable.id,
           submittedAt: formSubmissionsTable.submittedAt,
         })
         .from(formSubmissionsTable)
@@ -310,6 +397,15 @@ class FormSubmissionService {
         .from(responseEventsTable)
         .where(eq(responseEventsTable.formId, formId)),
     ]);
+    const answers = await db
+      .select({
+        submissionId: responseAnswersTable.submissionId,
+        fieldId: responseAnswersTable.fieldId,
+        rawValue: responseAnswersTable.rawValue,
+      })
+      .from(responseAnswersTable)
+      .where(eq(responseAnswersTable.formId, formId));
+    const answersBySubmission = groupAnswersBySubmission(answers);
 
     const totalResponses = submissions.length;
     const totalSubmissions = events.filter((event) => event.type === "submit").length;
@@ -328,7 +424,7 @@ class FormSubmissionService {
       let ratingCount = 0;
 
       for (const submission of submissions) {
-        const answer = getAnswerValue(submission.values, field.id);
+        const answer = getAnswerValue(answersBySubmission.get(submission.id) ?? [], field.id);
         if (!answer) continue;
 
         if (field.type === "SINGLE_SELECT") {
@@ -393,21 +489,30 @@ class FormSubmissionService {
       this.getResponseFields(formId),
       db
         .select({
+          id: formSubmissionsTable.id,
           respondentEmail: formSubmissionsTable.respondentEmail,
-          values: formSubmissionsTable.values,
           submittedAt: formSubmissionsTable.submittedAt,
         })
         .from(formSubmissionsTable)
         .where(eq(formSubmissionsTable.formId, formId))
         .orderBy(formSubmissionsTable.submittedAt),
     ]);
+    const answers = await db
+      .select({
+        submissionId: responseAnswersTable.submissionId,
+        fieldId: responseAnswersTable.fieldId,
+        rawValue: responseAnswersTable.rawValue,
+      })
+      .from(responseAnswersTable)
+      .where(eq(responseAnswersTable.formId, formId));
+    const answersBySubmission = groupAnswersBySubmission(answers);
 
     const header = ["Submitted At", "Respondent Email", ...fields.map((field) => field.label)];
     const rows = responses.map((response) => [
       response.submittedAt?.toISOString() ?? "",
       response.respondentEmail ?? "",
       ...fields.map((field) =>
-        formatResponseValueForCsv(field, getAnswerValue(response.values, field.id)),
+        formatResponseValueForCsv(field, getAnswerValue(answersBySubmission.get(response.id) ?? [], field.id)),
       ),
     ]);
     const csv = [header, ...rows].map((row) => row.map(escapeCsvValue).join(",")).join("\n");

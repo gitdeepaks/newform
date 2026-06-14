@@ -1,11 +1,12 @@
-import { and, count, db, eq, ne } from "@repo/database";
+import { and, count, db, desc, eq, ne } from "@repo/database";
 import {
   formFieldsTable,
+  formVersionsTable,
   formsTable,
   formSubmissionsTable,
   themesTable,
 } from "@repo/database/schema";
-import type { ThemeTokens } from "@repo/database/schema";
+import type { FormVersionSchemaSnapshot, ThemeTokens } from "@repo/database/schema";
 import { formFieldTypeSchema } from "../form-field/model";
 import {
   cloneFormInputSchema,
@@ -97,6 +98,24 @@ class FormService {
   private cloneTitle(title: string) {
     const nextTitle = `Copy of ${title}`;
     return nextTitle.length > 55 ? nextTitle.slice(0, 55).trim() : nextTitle;
+  }
+
+  private buildVersionSnapshot(
+    form: {
+      id: string;
+      title: string;
+      description: string | null;
+      slug: string;
+      thankYouTitle: string | null;
+      thankYouMessage: string | null;
+    },
+    fields: FormVersionSchemaSnapshot["fields"],
+  ): FormVersionSchemaSnapshot {
+    return {
+      form,
+      fields,
+      createdAt: new Date().toISOString(),
+    };
   }
 
   public async createForm(input: CreateFormInputSchemaType) {
@@ -364,20 +383,72 @@ class FormService {
     const { formId, userId } = await publishFormInputSchema.parseAsync(input);
     await this.assertFormOwner(formId, userId);
 
-    const fieldCountRows = await db
-      .select({ value: count() })
-      .from(formFieldsTable)
-      .where(eq(formFieldsTable.formId, formId));
+    const formRows = await db
+      .select({
+        id: formsTable.id,
+        title: formsTable.title,
+        description: formsTable.description,
+        slug: formsTable.slug,
+        thankYouTitle: formsTable.thankYouTitle,
+        thankYouMessage: formsTable.thankYouMessage,
+      })
+      .from(formsTable)
+      .where(eq(formsTable.id, formId))
+      .limit(1);
+    const form = formRows[0];
+    if (!form) throw new Error(`Form With ${formId} Not Found`);
 
-    if ((fieldCountRows[0]?.value ?? 0) === 0) {
+    const fields = await db
+      .select({
+        id: formFieldsTable.id,
+        label: formFieldsTable.label,
+        labelKey: formFieldsTable.labelKey,
+        description: formFieldsTable.description,
+        placeholder: formFieldsTable.placeholder,
+        type: formFieldsTable.type,
+        isRequired: formFieldsTable.isRequired,
+        pageIndex: formFieldsTable.pageIndex,
+        index: formFieldsTable.index,
+        options: formFieldsTable.options,
+        validation: formFieldsTable.validation,
+        visibilityCondition: formFieldsTable.visibilityCondition,
+      })
+      .from(formFieldsTable)
+      .where(eq(formFieldsTable.formId, formId))
+      .orderBy(formFieldsTable.pageIndex, formFieldsTable.index);
+
+    if (fields.length === 0) {
       throw new Error("Add at least one field before publishing");
     }
 
-    const rows = await db
-      .update(formsTable)
-      .set({ status: "published", publishedAt: new Date() })
-      .where(eq(formsTable.id, formId))
-      .returning({ id: formsTable.id, slug: formsTable.slug });
+    const rows = await db.transaction(async (tx) => {
+      const existingVersions = await tx
+        .select({ versionNumber: formVersionsTable.versionNumber })
+        .from(formVersionsTable)
+        .where(eq(formVersionsTable.formId, formId))
+        .orderBy(desc(formVersionsTable.versionNumber))
+        .limit(1);
+      const nextVersionNumber = (existingVersions[0]?.versionNumber ?? 0) + 1;
+
+      await tx
+        .update(formVersionsTable)
+        .set({ status: "superseded" })
+        .where(and(eq(formVersionsTable.formId, formId), eq(formVersionsTable.status, "active")));
+
+      await tx.insert(formVersionsTable).values({
+        formId,
+        versionNumber: nextVersionNumber,
+        status: "active",
+        schemaSnapshot: this.buildVersionSnapshot(form, fields),
+        createdBy: userId,
+      });
+
+      return tx
+        .update(formsTable)
+        .set({ status: "published", publishedAt: new Date() })
+        .where(eq(formsTable.id, formId))
+        .returning({ id: formsTable.id, slug: formsTable.slug });
+    });
 
     if (!rows[0]?.id) throw new Error(`Form With ${formId} Not Found`);
     return rows[0];
@@ -436,11 +507,25 @@ class FormService {
     const rows = await db
       .select({
         id: formsTable.id,
+        title: formsTable.title,
+        description: formsTable.description,
+        slug: formsTable.slug,
         status: formsTable.status,
+        visibility: formsTable.visibility,
+        thankYouTitle: formsTable.thankYouTitle,
+        thankYouMessage: formsTable.thankYouMessage,
+        publishedAt: formsTable.publishedAt,
         expiresAt: formsTable.expiresAt,
         responseLimit: formsTable.responseLimit,
+        theme: {
+          id: themesTable.id,
+          name: themesTable.name,
+          category: themesTable.category,
+          tokens: themesTable.tokens,
+        },
       })
       .from(formsTable)
+      .leftJoin(themesTable, eq(themesTable.id, formsTable.themeId))
       .where(eq(formsTable.slug, slug))
       .limit(1);
 
@@ -464,7 +549,36 @@ class FormService {
       }
     }
 
-    return this.getFormById({ formId: form.id });
+    const versionRows = await db
+      .select({ schemaSnapshot: formVersionsTable.schemaSnapshot })
+      .from(formVersionsTable)
+      .where(and(eq(formVersionsTable.formId, form.id), eq(formVersionsTable.status, "active")))
+      .limit(1);
+    const activeVersion = versionRows[0];
+    if (!activeVersion) throw new Error(`Form With ${slug} Not Found`);
+
+    return {
+      id: form.id,
+      title: activeVersion.schemaSnapshot.form.title,
+      description: activeVersion.schemaSnapshot.form.description,
+      slug: form.slug,
+      status: form.status,
+      visibility: form.visibility,
+      thankYouTitle: activeVersion.schemaSnapshot.form.thankYouTitle,
+      thankYouMessage: activeVersion.schemaSnapshot.form.thankYouMessage,
+      publishedAt: form.publishedAt,
+      expiresAt: form.expiresAt,
+      responseLimit: form.responseLimit,
+      theme: this.toTheme(form.theme),
+      fields: activeVersion.schemaSnapshot.fields.map((field) => ({
+        ...field,
+        index: String(field.index),
+        type: formFieldTypeSchema.parse(field.type),
+        formId: form.id,
+        createdAt: null,
+        updatedAt: null,
+      })),
+    };
   }
 
   public async getPublicRedirectById(input: GetPublicRedirectByIdInputSchemaType) {
