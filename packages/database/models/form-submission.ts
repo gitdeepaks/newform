@@ -4,7 +4,7 @@ import { formVersionsTable } from "./form-version";
 
 export interface FormSubmissionValues {
   formFieldId: string;
-  value: string;
+  value: string | string[] | number | boolean | null;
 }
 
 export type FormSubmissionValueRow = FormSubmissionValues[];

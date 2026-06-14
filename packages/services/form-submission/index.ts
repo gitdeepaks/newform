@@ -8,13 +8,10 @@ import {
   responseAnswersTable,
   responseEventsTable,
   usersTable,
+  type FormVersionFieldSnapshot,
   type FormSubmissionMetadata,
 } from "@repo/database/schema";
-import {
-  parseStringArray,
-  validateAnswer,
-  type PublicField,
-} from "./answer-validation";
+import { parseStringArray } from "./answer-validation";
 import { isFieldVisibleForSubmission } from "./conditional-visibility";
 import { escapeCsvValue, formatResponseValueForCsv, getAnalyticsOptionLabel } from "./csv";
 import {
@@ -32,9 +29,32 @@ import {
   type SubmitPublicResponseInputSchemaType,
 } from "./model";
 import { checkRateLimit } from "./rate-limit";
+import {
+  ResponseValidationError,
+  buildResponseSchema,
+  formatValidationErrors,
+  normalizeAnswerValue,
+  type ResponseInputValue,
+} from "./response-schema";
 
 type ResponseAnswerValue = string | string[] | number | boolean | null;
 type RebuiltAnswer = { formFieldId: string; value: string };
+type SubmittedAnswer = { formFieldId: string; value: ResponseInputValue };
+type NormalizedAnswerInsert = {
+  fieldId: string;
+  fieldKey: string;
+  fieldLabelSnapshot: string;
+  fieldType: string;
+  rawValue: ResponseAnswerValue;
+  normalizedText: string | null;
+  normalizedNumber: string | null;
+  normalizedDate: Date | null;
+  optionValues: string[] | null;
+};
+
+function isDefined<T>(value: T | undefined): value is T {
+  return value !== undefined;
+}
 
 function stringifyAnswerValue(value: ResponseAnswerValue): string {
   if (value === null) return "";
@@ -58,28 +78,68 @@ function groupAnswersBySubmission(
   return answerMap;
 }
 
-function normalizeAnswerForInsert(field: PublicField & { label: string; labelKey: string }, value: string) {
-  const options = field.options ?? [];
-  const hasOptions = options.length > 0;
-  const arrayValue = field.type === "MULTI_SELECT" || (field.type === "CHECKBOX" && hasOptions)
-    ? parseStringArray(value)
-    : null;
-  const numberValue = field.type === "NUMBER" || field.type === "RATING" ? Number(value) : null;
-  const dateValue = field.type === "DATE" && value ? new Date(value) : null;
-
-  return {
-    fieldId: field.id,
-    fieldKey: field.labelKey,
-    fieldLabelSnapshot: field.label,
-    fieldType: field.type,
-    rawValue: arrayValue ?? (numberValue !== null && Number.isFinite(numberValue) ? numberValue : value),
-    normalizedText: arrayValue ? null : value,
-    normalizedNumber: numberValue !== null && Number.isFinite(numberValue) ? String(numberValue) : null,
-    normalizedDate: dateValue && !Number.isNaN(dateValue.getTime()) ? dateValue : null,
-    optionValues: arrayValue,
-  };
+function buildAnswerMap(values: SubmittedAnswer[]) {
+  const answerByFieldId = new Map<string, ResponseInputValue>();
+  for (const answer of values) {
+    if (answerByFieldId.has(answer.formFieldId)) {
+      throw new ResponseValidationError([
+        {
+          fieldId: answer.formFieldId,
+          fieldKey: answer.formFieldId,
+          message: "Duplicate form field submitted",
+        },
+      ]);
+    }
+    answerByFieldId.set(answer.formFieldId, answer.value);
+  }
+  return answerByFieldId;
 }
 
+function validateAndNormalizeAnswers(
+  fields: FormVersionFieldSnapshot[],
+  values: SubmittedAnswer[],
+) {
+  const fieldById = new Map(fields.map((field) => [field.id, field]));
+  const answerByFieldId = buildAnswerMap(values);
+  for (const answer of values) {
+    if (!fieldById.has(answer.formFieldId)) {
+      throw new ResponseValidationError([
+        {
+          fieldId: answer.formFieldId,
+          fieldKey: answer.formFieldId,
+          message: "Unknown form field submitted",
+        },
+      ]);
+    }
+  }
+
+  const responseValues: Record<string, ResponseInputValue> = {};
+  for (const field of fields) {
+    const answer = answerByFieldId.get(field.id);
+    if (answer !== undefined) responseValues[field.id] = answer;
+  }
+
+  const validationResult = buildResponseSchema(fields).safeParse(responseValues);
+  if (!validationResult.success) {
+    throw new ResponseValidationError(formatValidationErrors(validationResult.error, fields));
+  }
+
+  const normalizedAnswers: NormalizedAnswerInsert[] = fields
+    .map((field) => {
+      const normalizedValue = normalizeAnswerValue(field, responseValues[field.id]);
+      if (!normalizedValue) return undefined;
+      return {
+        fieldId: field.id,
+        fieldKey: field.labelKey,
+        fieldLabelSnapshot: field.label,
+        fieldType: field.type,
+        ...normalizedValue,
+      };
+    })
+    .filter(isDefined);
+
+  return { answerByFieldId, responseValues, normalizedAnswers };
+}
 
 class FormSubmissionService {
   private async verifyOwner(formId: string, userId: string) {
@@ -118,27 +178,36 @@ class FormSubmissionService {
       .limit(1);
     const version = versionRows[0];
     if (!version) throw new Error("Active form version not found");
+    const { normalizedAnswers } = validateAndNormalizeAnswers(version.schemaSnapshot.fields, values);
 
-    const submissionInsertResult = await db
-      .insert(formSubmissionsTable)
-      .values({
-        formId,
-        formVersionId: version.id,
-        rawPayload: values,
-      })
-      .returning({
-        id: formSubmissionsTable.id,
-      });
+    const submissionId = await db.transaction(async (tx) => {
+      const submissionInsertResult = await tx
+        .insert(formSubmissionsTable)
+        .values({
+          formId,
+          formVersionId: version.id,
+          rawPayload: values,
+        })
+        .returning({ id: formSubmissionsTable.id });
 
-    if (
-      !submissionInsertResult ||
-      submissionInsertResult.length === 0 ||
-      !submissionInsertResult[0]?.id
-    ) {
-      throw new Error("Failed to create submission");
-    }
+      const insertedSubmissionId = submissionInsertResult[0]?.id;
+      if (!insertedSubmissionId) throw new Error("Failed to create submission");
 
-    return { id: submissionInsertResult[0].id };
+      if (normalizedAnswers.length > 0) {
+        await tx.insert(responseAnswersTable).values(
+          normalizedAnswers.map((answer) => ({
+            submissionId: insertedSubmissionId,
+            formId,
+            formVersionId: version.id,
+            ...answer,
+          })),
+        );
+      }
+
+      return insertedSubmissionId;
+    });
+
+    return { id: submissionId };
   }
 
   public async submitPublicResponse(input: SubmitPublicResponseInputSchemaType) {
@@ -147,7 +216,7 @@ class FormSubmissionService {
 
     if (honeypot?.trim()) throw new Error("Submission rejected");
 
-    checkRateLimit(`${metadata?.ip ?? "unknown"}:${slug}`);
+    checkRateLimit(`${metadata?.ip ?? "anonymous"}:${slug}`);
 
     const formRows = await db
       .select({
@@ -178,9 +247,17 @@ class FormSubmissionService {
     const fields = activeVersion.schemaSnapshot.fields;
 
     const fieldById = new Map(fields.map((field) => [field.id, field]));
-    const answerByFieldId = new Map(values.map((answer) => [answer.formFieldId, answer.value]));
+    const answerByFieldId = buildAnswerMap(values);
     for (const answer of values) {
-      if (!fieldById.has(answer.formFieldId)) throw new Error("Unknown form field submitted");
+      if (!fieldById.has(answer.formFieldId)) {
+        throw new ResponseValidationError([
+          {
+            fieldId: answer.formFieldId,
+            fieldKey: answer.formFieldId,
+            message: "Unknown form field submitted",
+          },
+        ]);
+      }
     }
 
     const visibleFields = fields.filter((field) =>
@@ -188,27 +265,15 @@ class FormSubmissionService {
     );
     const visibleFieldIds = new Set(visibleFields.map((field) => field.id));
     const visibleValues = values.filter((answer) => visibleFieldIds.has(answer.formFieldId));
+    const { normalizedAnswers } = validateAndNormalizeAnswers(visibleFields, visibleValues);
 
-    for (const answer of visibleValues) {
-      const field = fieldById.get(answer.formFieldId);
-      if (!field) throw new Error("Unknown form field submitted");
-      validateAnswer(field, answer.value);
-    }
-
-    for (const field of visibleFields) {
-      const answer = answerByFieldId.get(field.id);
-      if (field.isRequired && (!answer || answer.trim().length === 0)) {
-        throw new Error("Please complete all required fields");
-      }
-    }
-
-    const respondentEmail = fields.find((field) => field.type === "EMAIL")?.id;
+    const respondentEmail = visibleFields.find((field) => field.type === "EMAIL")?.id;
     const responseMetadata: FormSubmissionMetadata = { ...metadata, slug };
     const creatorEmail = form.creatorEmail ?? undefined;
-    const submittedRespondentEmail = respondentEmail
-      ? answerByFieldId.get(respondentEmail)
+    const submittedRespondentEmailValue = respondentEmail ? answerByFieldId.get(respondentEmail) : undefined;
+    const submittedRespondentEmail = typeof submittedRespondentEmailValue === "string"
+      ? submittedRespondentEmailValue
       : undefined;
-
     const submissionId = await db.transaction(async (tx) => {
       await tx.execute(sql`select id from forms where id = ${form.id} for update`);
 
@@ -253,18 +318,15 @@ class FormSubmissionService {
       const insertedSubmissionId = submissionInsertResult[0]?.id;
       if (!insertedSubmissionId) throw new Error("Failed to create submission");
 
-      if (visibleValues.length > 0) {
-        const normalizedAnswers = visibleValues.map((answer) => {
-          const field = fieldById.get(answer.formFieldId);
-          if (!field) throw new Error("Unknown form field submitted");
-          return {
+      if (normalizedAnswers.length > 0) {
+        await tx.insert(responseAnswersTable).values(
+          normalizedAnswers.map((answer) => ({
             submissionId: insertedSubmissionId,
             formId: form.id,
             formVersionId: activeVersion.id,
-            ...normalizeAnswerForInsert(field, answer.value),
-          };
-        });
-        await tx.insert(responseAnswersTable).values(normalizedAnswers);
+            ...answer,
+          })),
+        );
       }
 
       await tx.insert(responseEventsTable).values({
@@ -294,7 +356,7 @@ class FormSubmissionService {
               status: "queued",
             }
           : undefined,
-      ].filter((event) => event !== undefined);
+      ].filter(isDefined);
 
       if (emailEvents.length > 0) await tx.insert(emailEventsTable).values(emailEvents);
 

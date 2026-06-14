@@ -75,9 +75,22 @@ export const updateSlugOutputSchema = z.object({
   slug: z.string().describe("The updated slug"),
 });
 
+const responseInputValueSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
 export const submissionValueSchema = z.object({
   formFieldId: z.string().describe("The id of the form field being answered"),
-  value: z.string().describe("The submitted value for the form field"),
+  value: responseInputValueSchema.describe("The submitted value for the form field"),
+});
+
+export const submissionDisplayValueSchema = z.object({
+  formFieldId: z.string().describe("The id of the form field being answered"),
+  value: z.string().describe("The submitted display value for the form field"),
 });
 
 export const submitPublicResponseOutputSchema = z.object({
@@ -99,7 +112,7 @@ export const getSubmissionsOutputSchema = z.array(
     id: z.string().describe("The id of the submission"),
     formId: z.string().nullable().describe("The id of the form this submission belongs to"),
     values: z
-      .array(submissionValueSchema)
+      .array(submissionDisplayValueSchema)
       .nullable()
       .describe("The submitted answers for the form fields"),
     createdAt: z.date().nullable().describe("The date the submission was created"),
@@ -153,7 +166,7 @@ export const listResponsesOutputSchema = z.object({
     z.object({
       id: z.string(),
       respondentEmail: z.string().nullable(),
-      values: z.array(submissionValueSchema).nullable(),
+      values: z.array(submissionDisplayValueSchema).nullable(),
       metadata: responseMetadataSchema,
       submittedAt: z.date().nullable(),
       createdAt: z.date().nullable(),

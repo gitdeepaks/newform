@@ -1,12 +1,20 @@
 import { z } from "zod";
 
+export const responseInputValueSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
 export const createSubmissionInputSchema = z.object({
   formId: z.string().describe("The id of the form being submitted"),
   values: z
     .array(
       z.object({
         formFieldId: z.string().describe("The id of the form field being answered"),
-        value: z.string().describe("The submitted value for the form field"),
+        value: responseInputValueSchema.describe("The submitted value for the form field"),
       }),
     )
     .describe("The submitted answers for the form fields"),
@@ -14,7 +22,7 @@ export const createSubmissionInputSchema = z.object({
 
 export const publicAnswerSchema = z.object({
   formFieldId: z.string(),
-  value: z.string(),
+  value: responseInputValueSchema,
 });
 
 export const submitPublicResponseInputSchema = z.object({

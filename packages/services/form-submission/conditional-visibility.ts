@@ -1,13 +1,11 @@
-import type { FormFieldVisibilityCondition } from "@repo/database/schema";
-import type { PublicField } from "./answer-validation";
+import type { FormVersionFieldSnapshot } from "@repo/database/schema";
+import type { ResponseInputValue } from "./response-schema";
 
-export type ConditionalPublicField = PublicField & {
-  visibilityCondition: FormFieldVisibilityCondition | null;
-};
+export type ConditionalPublicField = FormVersionFieldSnapshot;
 
 export function isFieldVisibleForSubmission(
   field: ConditionalPublicField,
-  answerByFieldId: Map<string, string>,
+  answerByFieldId: Map<string, ResponseInputValue>,
 ): boolean {
   const condition = field.visibilityCondition;
   if (!condition) return true;
@@ -15,6 +13,7 @@ export function isFieldVisibleForSubmission(
   const sourceValue = answerByFieldId.get(condition.sourceFieldId);
   if (sourceValue === undefined) return false;
 
-  if (condition.operator === "equals") return sourceValue === condition.value;
-  return sourceValue !== condition.value;
+  const comparableValue = Array.isArray(sourceValue) ? sourceValue.join(",") : String(sourceValue);
+  if (condition.operator === "equals") return comparableValue === condition.value;
+  return comparableValue !== condition.value;
 }
